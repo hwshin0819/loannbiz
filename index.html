@@ -3,146 +3,117 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>중개사무소 지도</title>
+    <title>론앤비즈 파트너 중개업소</title>
+    <script type="text/javascript" src="https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAPS_API_KEY&callback=initMap&libraries=places" async defer></script>
+    <script src="https://apis.google.com/js/api.js"></script>
     <style>
-        /* 지도 크기 지정 */
         #map {
-            height: 100vh;
             width: 100%;
+            height: 500px;
         }
-        /* 선택창 스타일 */
-        #filters {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            background-color: rgba(255, 255, 255, 0.7);
-            padding: 10px;
-            z-index: 1000;
-            border-radius: 8px;
+        .search-box {
+            margin: 10px;
         }
     </style>
 </head>
 <body>
-    <!-- 지도 표시 영역 -->
-    <div id="map"></div>
-
-    <!-- 담당자 선택 드롭다운 -->
-    <div id="filters">
-        <label for="staff-select">담당자 선택: </label>
-        <select id="staff-select">
-            <option value="">전체</option>
-        </select>
+    <h1>론앤비즈 파트너 중개업소 지도</h1>
+    <div class="search-box">
+        <input type="text" id="search" placeholder="중개사무소명 검색">
+        <button onclick="searchOffice()">검색</button>
     </div>
-
-    <!-- 구글 시트 API 및 지도 API 불러오기 -->
-    <script src="https://apis.google.com/js/api.js"></script>
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBbgM7E_p4X7UZ_gnoSUe1fg71bU-kNSG0&callback=initMap" async defer></script>
+    <div id="map"></div>
     
     <script>
-        // 지도 및 데이터 변수
         let map;
         let markers = [];
-        let staffData = [];  // 담당자 데이터를 담을 배열
+        let offices = [];
 
-        // 지도 초기화 함수
-        function initMap() {
-            // 기본 위치 설정 (서울)
-            const center = { lat: 37.5665, lng: 126.9780 };
-
-            // 지도 생성
-            map = new google.maps.Map(document.getElementById('map'), {
-                zoom: 10,
-                center: center,
-            });
-
-            // 구글 시트 데이터 로드
-            loadDataFromGoogleSheets();
-        }
-
-        // 구글 시트 API로 데이터 불러오기
-        function loadDataFromGoogleSheets() {
-            const spreadsheetId = '1ZszZW_iI-F6Q3N2M7c_l6JZTrcEMUHLwfOizLVbs3sY';  // 구글 시트 ID
-            const range = 'Sheet1!A2:G';  // 데이터 범위 (A열에서 G열까지)
-            const apiKey = 'AIzaSyBbgM7E_p4X7UZ_gnoSUe1fg71bU-kNSG0';  // API 키
-
-            const sheetAPI = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}?key=${apiKey}`;
-
-            fetch(sheetAPI)
-                .then(response => response.json())
-                .then(data => {
-                    const rows = data.values;
-                    if (rows.length) {
-                        rows.forEach(row => {
-                            const name = row[0];   // A열: 중개사무소명
-                            const address = row[1]; // B열: 주소
-                            const phone = row[2];   // C열: 전화번호
-                            const staff = row[3];   // D열: 담당자
-                            const ranking = row[4]; // E열: 랭킹
-                            const lat = parseFloat(row[5]);  // F열: X좌표
-                            const lng = parseFloat(row[6]);  // G열: Y좌표
-
-                            if (lat && lng) {
-                                const marker = new google.maps.Marker({
-                                    position: { lat: lat, lng: lng },
-                                    map: map,
-                                    title: name,
-                                });
-
-                                // 마커 클릭 시 정보 창 띄우기
-                                const infoWindow = new google.maps.InfoWindow({
-                                    content: `<div><strong>${name}</strong><br>${address}<br>전화: ${phone}<br>담당자: ${staff}<br>랭킹: ${ranking}</div>`,
-                                });
-
-                                marker.addListener('click', () => {
-                                    infoWindow.open(map, marker);
-                                });
-
-                                markers.push(marker);
-
-                                // 담당자 목록에 담당자 추가 (중복 제거)
-                                if (staff && !staffData.includes(staff)) {
-                                    staffData.push(staff);
-                                }
-                            }
-                        });
-
-                        // 담당자 선택 드롭다운 업데이트
-                        updateStaffSelect();
-                    } else {
-                        alert('데이터가 없습니다.');
+        // 구글 시트 데이터 불러오기
+        function loadSheetData() {
+            gapi.client.sheets.spreadsheets.values.get({
+                spreadsheetId: '1ZszZW_iI-F6Q3N2M7c_l6JZTrcEMUHLwfOizLVbs3sY',
+                range: 'Sheet1!A2:G',  // A2부터 G열까지
+            }).then(function(response) {
+                const rows = response.result.values;
+                if (rows.length) {
+                    for (let i = 0; i < rows.length; i++) {
+                        const office = {
+                            name: rows[i][0],  // A열: 중개사무소명
+                            address: rows[i][1],  // B열: 주소
+                            phone: rows[i][2],  // C열: 전화번호
+                            manager: rows[i][3],  // D열: 담당자
+                            rank: rows[i][4],  // E열: 랭킹
+                            x: parseFloat(rows[i][5]),  // F열: X좌표
+                            y: parseFloat(rows[i][6]),  // G열: Y좌표
+                        };
+                        offices.push(office);
                     }
-                })
-                .catch(error => console.error('구글 시트 데이터 로드 오류:', error));
-        }
-
-        // 담당자 선택 드롭다운 업데이트
-        function updateStaffSelect() {
-            const staffSelect = document.getElementById('staff-select');
-            staffData.forEach(staff => {
-                const option = document.createElement('option');
-                option.value = staff;
-                option.textContent = staff;
-                staffSelect.appendChild(option);
-            });
-
-            // 담당자 선택 시 필터링
-            staffSelect.addEventListener('change', () => {
-                const selectedStaff = staffSelect.value;
-                filterMarkersByStaff(selectedStaff);
-            });
-        }
-
-        // 담당자에 따라 마커 필터링
-        function filterMarkersByStaff(staff) {
-            markers.forEach(marker => {
-                const title = marker.getTitle();
-                if (staff === '' || title.includes(staff)) {
-                    marker.setMap(map);  // 선택된 담당자의 마커만 지도에 표시
-                } else {
-                    marker.setMap(null);  // 선택되지 않은 담당자의 마커는 숨기기
+                    initMap();
                 }
             });
         }
+
+        // 지도 초기화
+        function initMap() {
+            map = new google.maps.Map(document.getElementById("map"), {
+                center: { lat: offices[0].y, lng: offices[0].x },
+                zoom: 12,
+            });
+
+            // 마커 표시
+            offices.forEach(function(office) {
+                const marker = new google.maps.Marker({
+                    position: { lat: office.y, lng: office.x },
+                    map: map,
+                    title: office.name
+                });
+
+                const infowindow = new google.maps.InfoWindow({
+                    content: `
+                        <h3>${office.name}</h3>
+                        <p>주소: ${office.address}</p>
+                        <p>전화번호: ${office.phone}</p>
+                        <p>담당자: ${office.manager}</p>
+                        <p>랭킹: ${office.rank}</p>
+                    `
+                });
+
+                marker.addListener('click', function() {
+                    infowindow.open(map, marker);
+                });
+
+                markers.push(marker);
+            });
+        }
+
+        // 검색 함수
+        function searchOffice() {
+            const searchText = document.getElementById('search').value.toLowerCase();
+            markers.forEach(function(marker, index) {
+                const office = offices[index];
+                if (office.name.toLowerCase().includes(searchText)) {
+                    marker.setVisible(true);
+                } else {
+                    marker.setVisible(false);
+                }
+            });
+        }
+
+        // 구글 API 클라이언트 로드
+        function handleClientLoad() {
+            gapi.load("client", init);
+        }
+
+        function init() {
+            gapi.client.init({
+                apiKey: 'AIzaSyBbgM7E_p4X7UZ_gnoSUe1fg71bU-kNSG0',
+            }).then(function() {
+                loadSheetData();
+            });
+        }
     </script>
+
+    <script async defer onload="handleClientLoad()"></script>
 </body>
 </html>
