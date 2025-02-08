@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>론앤비즈 파트너 중개업소</title>
+    <script src="https://oapi.map.naver.com/openapi/v3/maps.js?ncpClientId=nrjjvl8zmx"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #28a745;
+            --secondary-color: #6c757d;
+            --background-color: #e9ecef;
+            --border-radius: 8px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: var(--background-color);
+            color: #333;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            min-height: 100vh;
+        }
+
+        .container {
+            flex: 3;
+            padding: 20px;
+            background-color: white;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        @media (max-width: 768px) {
+            body {
+                flex-direction: column;
+            }
+            .container {
+                flex: none;
+            }
+        }
+
+        #map {
+            width: 100%;
+            height: 500px;
+            margin-top: 20px;
+            border-radius: var(--border-radius);
+        }
+
+        .filter-panel {
+            flex: 1;
+            background: #f8f9fa;
+            padding: 20px;
+            border-left: 2px solid #dee2e6;
+            min-width: 300px;
+        }
+
+        .filter-panel h3 {
+            margin-bottom: 15px;
+            color: var(--secondary-color);
+        }
+
+        .region-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            background-color: #f0f0f0;
+            transition: all 0.3s ease;
+        }
+
+        button:hover {
+            background-color: #e0e0e0;
+        }
+
+        button.active {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        .file-upload-container {
+            margin: 20px 0;
+        }
+
+        .file-upload-label {
+            display: inline-block;
+            padding: 8px 16px;
+            background-color: var(--primary-color);
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-bottom: 10px;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        select {
+            width: 100%;
+            padding: 8px;
+            margin: 10px 0;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+
+        #officeList {
+            margin-top: 20px;
+            max-height: calc(100vh - 300px);
+            overflow-y: auto;
+            padding-right: 10px;
+        }
+
+        #officeList li {
+            list-style: none;
+            padding: 15px;
+            border-radius: var(--border-radius);
+            background: white;
+            margin-bottom: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            transition: transform 0.2s ease;
+            cursor: pointer;
+        }
+
+        #officeList li:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            background-color: #f8f9fa;
+        }
+
+        #officeList li p {
+            margin: 5px 0;
+            font-size: 14px;
+        }
+
+        .loading {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255, 255, 255, 0.9);
+            padding: 20px;
+            border-radius: var(--border-radius);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            display: none;
+            z-index: 1000;
+        }
+
+        .error-message {
+            color: #dc3545;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: var(--border-radius);
+            background-color: #f8d7da;
+            display: none;
+        }
+
+        .info-window {
+            padding: 15px;
+            max-width: 300px;
+            font-size: 14px;
+        }
+
+        .info-window h3 {
+            margin-bottom: 10px;
+            color: var(--primary-color);
+        }
+
+        .info-window p {
+            margin: 8px 0;
+            line-height: 1.4;
+        }
+
+        .circle {
+            stroke: #ff0000;
+            stroke-width: 2;
+            stroke-opacity: 0.3;
+            fill: #ff0000;
+            fill-opacity: 0.1;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 style="text-align: center;">론앤비즈 파트너 중개업소</h1>
+        <div class="file-upload-container">
+            <label for="fileUpload" class="file-upload-label">파일 업로드</label>
+            <input type="file" id="fileUpload" accept=".csv, .xlsx, .xls">
+            <div id="uploadError" class="error-message"></div>
+        </div>
+        <div id="map"></div>
+        <div id="loading" class="loading">데이터 로딩 중...</div>
+    </div>
+    <div class="filter-panel">
+        <h3>필터</h3>
+        <label for="regionFilter">지역 선택:</label>
+        <div class="region-buttons">
+            <button data-region="수도권">수도권</button>
+            <button data-region="지방">지방</button>
+        </div>
+        <label for="managerFilter">담당자 선택:</label>
+        <select id="managerFilter" aria-label="담당자 필터">
+            <option value="">전체</option>
+        </select>
+        <button onclick="MapController.getInstance().filterData()">검색</button>
+        <button onclick="MapController.getInstance().clearFilters()">필터 초기화</button>
+        <p id="resultCount" aria-live="polite">검색 결과: 0개</p>
+        <ul id="officeList" aria-label="중개업소 목록"></ul>
+    </div>
+
+    <script>
+        class MapController {
+            static instance = null;
+            
+            constructor() {
+                this.map = null;
+                this.markers = [];
+                this.markerPool = [];
+                this.currentInfoWindow = null;
+                this.partnerData = [];
+                this.selectedRegion = "";
+                this.radiusCircle = null;
+                this.nearbyMarkers = [];
+                
+                this.initMap();
+                this.initEventListeners();
+                this.loadSavedData();
+            }
+
+            static getInstance() {
+                if (!MapController.instance) {
+                    MapController.instance = new MapController();
+                }
+                return MapController.instance;
+            }
+
+            initMap() {
+                this.map = new naver.maps.Map('map', {
+                    center: new naver.maps.LatLng(37.5666805, 126.9784147),
+                    zoom: 11,
+                    minZoom: 6,
+                    scaleControl: true,
+                    mapDataControl: true,
+                    zoomControl: true
+                });
+
+                naver.maps.Event.addListener(this.map, 'click', () => {
+                    if (this.currentInfoWindow) {
+                        this.currentInfoWindow.close();
+                        this.currentInfoWindow = null;
+                    }
+                });
+            }
+
+            initEventListeners() {
+                document.getElementById('fileUpload').addEventListener('change', (e) => this.handleFileUpload(e));
+                
+                document.querySelectorAll('.region-buttons button').forEach(button => {
+                    button.addEventListener('click', () => this.toggleRegion(button.dataset.region));
+                });
+            }
+
+            loadSavedData() {
+                const savedData = localStorage.getItem('partnerData');
+                if (savedData) {
+                    try {
+                        this.partnerData = JSON.parse(savedData);
+                        this.updateMap();
+                        this.populateManagerFilter();
+                    } catch (error) {
+                        this.showError('저장된 데이터를 불러오는데 실패했습니다.');
+                    }
+                }
+            }
+
+            async handleFileUpload(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                this.showLoading(true);
+                try {
+                    const fileExtension = file.name.split('.').pop().toLowerCase();
+                    if (fileExtension === 'csv') {
+                        await this.handleCSV(file);
+                    } else if (['xlsx', 'xls'].includes(fileExtension)) {
+                        await this.handleExcel(file);
+                    } else {
+                        throw new Error('지원하지 않는 파일 형식입니다.');
+                    }
+                } catch (error) {
+                    this.showError(error.message);
+                } finally {
+                    this.showLoading(false);
+                    event.target.value = '';
+                }
+            }
+
+            async handleCSV(file) {
+                return new Promise((resolve, reject) => {
+                    Papa.parse(file, {
+                        complete: (results) => {
+                            if (results.errors.length > 0) {
+                                reject(new Error('CSV 파일 파싱 중 오류가 발생했습니다.'));
+                                return;
+                            }
+                            this.processData(results.data);
+                            resolve();
+                        },
+                        header: true,
+                        skipEmptyLines: true,
+                        error: (error) => {
+                            reject(new Error('CSV 파일을 읽는 중 오류가 발생했습니다.'));
+                        }
+                    });
+                });
+            }
+
+            async handleExcel(file) {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        try {
+                            const data = new Uint8Array(e.target.result);
+                            const workbook = XLSX.read(data, { type: 'array' });
+                            const firstSheetName = workbook.SheetNames[0];
+                            const worksheet = workbook.Sheets[firstSheetName];
+                            const jsonData = XLSX.utils.sheet_to_json(worksheet);
+                            this.processData(jsonData);
+                            resolve();
+                        } catch (error) {
+                            reject(new Error('엑셀 파일을 처리하는 중 오류가 발생했습니다.'));
+                        }
+                    };
+                    reader.onerror = () => reject(new Error('파일을 읽는 중 오류가 발생했습니다.'));
+                    reader.readAsArrayBuffer(file);
+                });
+            }
+
+            processData(data) {
+                this.partnerData = data.map(item => ({
+                    name: item.name || '',
+                    address: item.address || '',
+                    manager: item.manager || '',
+                    phone: item.phone || '-',
+                    rank: item.rank || '-',
+                    xCoord: parseFloat(item.xCoord) || 0,
+                    yCoord: parseFloat(item.yCoord) || 0
+                })).filter(item => item.xCoord && item.yCoord);
+
+                localStorage.setItem('partnerData', JSON.stringify(this.partnerData));
+                this.updateMap();
+                this.populateManagerFilter();
+            }
+
+            calculateDistance(lat1, lon1, lat2, lon2) {
+                const R = 6371; // 지구의 반경 (km)
+                const dLat = (lat2 - lat1) * Math.PI / 180;
+                const dLon = (lon2 - lon1) * Math.PI / 180;
+                const a = 
+                    Math.sin(dLat/2) * Math.sin(dLat/2) +
+                    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+                    Math.sin(dLon/2) * Math.sin(dLon/2);
+                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+                return R * c;
+            }
+
+            findNearbyOffices(centerLat, centerLon, radius) {
+                return this.partnerData.filter(office => {
+                    const distance = this.calculateDistance(
+                        centerLat, centerLon,
+                        office.yCoord, office.xCoord
+                    );
+                    return distance <= radius;
+                });
+            }
+
+            updateMap(filteredData) {
+                this.clearMarkers();
+                this.clearNearbyMarkers();
+                const bounds = new naver.maps.LatLngBounds();
+                const dataToShow = filteredData || this.partnerData;
+                let validMarkers = 0;
+
+                dataToShow.forEach(item => {
+                    if (!item.xCoord || !item.yCoord) return;
+
+                    const position = new naver.maps.LatLng(item.yCoord, item.xCoord);
+                    const marker = this.getMarker(position);
+                    
+                    const infoWindow = new naver.maps.InfoWindow({
+                        content: `
+                            <div class="info-window">
+                                <h3>${item.name}</h3>
+                                <p>📍 ${item.address}</p>
+<p>📞 ${item.phone}</p>
+                               <p>👤 담당자: ${item.manager}</p>
+                               <p>🏆 랭킹: ${item.rank}</p>
+                           </div>
+                       `
+                   });
+
+                   naver.maps.Event.addListener(marker, 'click', () => {
+                       if (this.currentInfoWindow) this.currentInfoWindow.close();
+                       infoWindow.open(this.map, marker);
+                       this.currentInfoWindow = infoWindow;
+                   });
+
+                   bounds.extend(position);
+                   validMarkers++;
+               });
+
+               if (validMarkers > 0) {
+                   this.map.fitBounds(bounds);
+                   this.map.padding = {
+                       top: 50,
+                       right: 50,
+                       bottom: 50,
+                       left: 50
+                   };
+               }
+
+               this.updateResultCount(validMarkers);
+               this.updateOfficeList(dataToShow);
+           }
+
+           clearNearbyMarkers() {
+               if (this.radiusCircle) {
+                   this.radiusCircle.setMap(null);
+                   this.radiusCircle = null;
+               }
+               this.nearbyMarkers.forEach(marker => marker.setMap(null));
+               this.nearbyMarkers = [];
+           }
+
+           showNearbyOffices(centerLat, centerLon) {
+               this.clearNearbyMarkers();
+               
+               // 5km 반경 원 그리기
+               const center = new naver.maps.LatLng(centerLat, centerLon);
+               this.radiusCircle = new naver.maps.Circle({
+                   map: this.map,
+                   center: center,
+                   radius: 5000,  // 5km를 미터 단위로
+                   strokeColor: '#5F5F5F',
+                   strokeOpacity: 0.3,
+                   strokeWeight: 2,
+                   fillColor: '#5F5F5F',
+                   fillOpacity: 0.1
+               });
+
+               // 5km 이내 중개사무소 찾기
+               const nearbyOffices = this.findNearbyOffices(centerLat, centerLon, 5);
+               
+               // 회색 마커로 표시
+               nearbyOffices.forEach(office => {
+                   if (office.yCoord === centerLat && office.xCoord === centerLon) return; // 중심점 제외
+
+                   const position = new naver.maps.LatLng(office.yCoord, office.xCoord);
+                   const marker = new naver.maps.Marker({
+                       position: position,
+                       map: this.map,
+                       icon: {
+                           content: '<div style="background-color: #808080; width: 24px; height: 24px; border-radius: 50%; border: 2px solid white;"></div>',
+                           anchor: new naver.maps.Point(12, 12)
+                       }
+                   });
+
+                   const infoWindow = new naver.maps.InfoWindow({
+                       content: `
+                           <div class="info-window">
+                               <h3>${office.name}</h3>
+                               <p>📍 ${office.address}</p>
+                               <p>📞 ${office.phone}</p>
+                               <p>👤 담당자: ${office.manager}</p>
+                               <p>🏆 랭킹: ${office.rank}</p>
+                           </div>
+                       `
+                   });
+
+                   naver.maps.Event.addListener(marker, 'click', () => {
+                       if (this.currentInfoWindow) this.currentInfoWindow.close();
+                       infoWindow.open(this.map, marker);
+                       this.currentInfoWindow = infoWindow;
+                   });
+
+                   this.nearbyMarkers.push(marker);
+               });
+           }
+
+           getMarker(position) {
+               let marker;
+               if (this.markerPool.length > 0) {
+                   marker = this.markerPool.pop();
+                   marker.setPosition(position);
+               } else {
+                   marker = new naver.maps.Marker({ position });
+               }
+               marker.setMap(this.map);
+               this.markers.push(marker);
+               return marker;
+           }
+
+           clearMarkers() {
+               this.markers.forEach(marker => {
+                   marker.setMap(null);
+                   this.markerPool.push(marker);
+               });
+               this.markers = [];
+           }
+
+           toggleRegion(region) {
+               this.selectedRegion = this.selectedRegion === region ? "" : region;
+               document.querySelectorAll('.region-buttons button').forEach(button => {
+                   button.classList.toggle('active', button.dataset.region === this.selectedRegion);
+               });
+               this.filterData();
+           }
+
+           filterData() {
+               let regionFiltered = [...this.partnerData];
+               let managerFiltered = [...this.partnerData];
+               const managerFilter = document.getElementById('managerFilter').value;
+
+               if (this.selectedRegion === "수도권") {
+                   regionFiltered = regionFiltered.filter(p => 
+                       p.address && ["서울", "경기", "인천"].some(region => p.address.includes(region))
+                   );
+               } else if (this.selectedRegion === "지방") {
+                   regionFiltered = regionFiltered.filter(p => 
+                       p.address && !["서울", "경기", "인천"].some(region => p.address.includes(region))
+                   );
+               }
+
+               if (managerFilter) {
+                   managerFiltered = managerFiltered.filter(p => p.manager === managerFilter);
+               }
+
+               const combinedResults = Array.from(new Set([...regionFiltered, ...managerFiltered]));
+               this.updateMap(combinedResults);
+           }
+
+           clearFilters() {
+               this.selectedRegion = "";
+               document.querySelectorAll('.region-buttons button').forEach(button => {
+                   button.classList.remove('active');
+               });
+               document.getElementById('managerFilter').value = "";
+               this.filterData();
+           }
+
+           populateManagerFilter() {
+               const managerSet = new Set(this.partnerData.map(p => p.manager).filter(Boolean));
+               const managerFilter = document.getElementById('managerFilter');
+               managerFilter.innerHTML = '<option value="">전체</option>' + 
+                   [...managerSet].sort().map(m => `<option value="${m}">${m}</option>`).join('');
+           }
+
+           updateOfficeList(filteredData) {
+               const officeList = document.getElementById('officeList');
+               officeList.innerHTML = (filteredData || this.partnerData)
+                   .filter(item => item.name && item.address) // undefined 제거
+                   .map(item => `
+                       <li onclick="MapController.getInstance().handleListItemClick(${item.yCoord}, ${item.xCoord})">
+                           <strong>${item.name}</strong>
+                           <p>📍 ${item.address}</p>
+                           <p>📞 ${item.phone}</p>
+                           <p>👤 담당자: ${item.manager}</p>
+                           <p>🏆 랭킹: ${item.rank}</p>
+                       </li>
+                   `).join('');
+           }
+
+           handleListItemClick(lat, lng) {
+               const position = new naver.maps.LatLng(lat, lng);
+               this.map.setCenter(position);
+               this.map.setZoom(15); // 적당한 줌 레벨로 설정
+               this.showNearbyOffices(lat, lng);
+           }
+
+           updateResultCount(count) {
+               document.getElementById('resultCount').textContent = `검색 결과: ${count}개`;
+           }
+
+           showError(message) {
+               const errorElement = document.getElementById('uploadError');
+               errorElement.textContent = message;
+               errorElement.style.display = 'block';
+               setTimeout(() => {
+                   errorElement.style.display = 'none';
+               }, 5000);
+           }
+
+           showLoading(show) {
+               document.getElementById('loading').style.display = show ? 'block' : 'none';
+           }
+       }
+
+       // 페이지 로드 시 MapController 인스턴스 생성
+       document.addEventListener('DOMContentLoaded', () => {
+           MapController.getInstance();
+       });
+   </script>
+</body>
+</html>
