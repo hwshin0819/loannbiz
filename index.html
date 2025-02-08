@@ -1,100 +1,148 @@
 <!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="utf-8">
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>중개사무소 지도</title>
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBbgM7E_p4X7UZ_gnoSUe1fg71bU-kNSG0&callback=initMap" async defer></script>
-    <script src="https://apis.google.com/js/api.js"></script>
     <style>
-      /* 지도 크기 설정 */
-      #map {
-        height: 100%;
-      }
-      html, body {
-        height: 100%;
-        margin: 0;
-      }
+        /* 지도 크기 지정 */
+        #map {
+            height: 100vh;
+            width: 100%;
+        }
+        /* 선택창 스타일 */
+        #filters {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background-color: rgba(255, 255, 255, 0.7);
+            padding: 10px;
+            z-index: 1000;
+            border-radius: 8px;
+        }
     </style>
-  </head>
-  <body>
-    <h3>중개사무소 지도</h3>
+</head>
+<body>
+    <!-- 지도 표시 영역 -->
     <div id="map"></div>
+
+    <!-- 담당자 선택 드롭다운 -->
+    <div id="filters">
+        <label for="staff-select">담당자 선택: </label>
+        <select id="staff-select">
+            <option value="">전체</option>
+        </select>
+    </div>
+
+    <!-- 구글 시트 API 및 지도 API 불러오기 -->
+    <script src="https://apis.google.com/js/api.js"></script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBbgM7E_p4X7UZ_gnoSUe1fg71bU-kNSG0&callback=initMap" async defer></script>
+    
     <script>
-      let map;
-      
-      // 지도 초기화
-      function initMap() {
-        map = new google.maps.Map(document.getElementById("map"), {
-          center: { lat: 37.5665, lng: 126.978 }, // 서울 중심
-          zoom: 12,
-        });
+        // 지도 및 데이터 변수
+        let map;
+        let markers = [];
+        let staffData = [];  // 담당자 데이터를 담을 배열
 
-        // 구글 시트 API 로드
-        gapi.load("client", initClient);
-      }
+        // 지도 초기화 함수
+        function initMap() {
+            // 기본 위치 설정 (서울)
+            const center = { lat: 37.5665, lng: 126.9780 };
 
-      // 구글 시트 API 초기화
-      function initClient() {
-        gapi.client.init({
-          apiKey: "AIzaSyBbgM7E_p4X7UZ_gnoSUe1fg71bU-kNSG0",
-        }).then(() => {
-          // 구글 시트 API 호출
-          loadSheetData();
-        });
-      }
-
-      // 구글 시트 데이터 불러오기
-      function loadSheetData() {
-        const sheetId = "1ZszZW_iI-F6Q3N2M7c_l6JZTrcEMUHLwfOizLVbs3sY";
-        const range = "Sheet1!A2:G"; // 데이터가 있는 범위 (A열부터 G열까지)
-
-        gapi.client.sheets.spreadsheets.values.get({
-          spreadsheetId: sheetId,
-          range: range,
-        }).then((response) => {
-          const rows = response.result.values;
-          if (rows.length) {
-            // 시트 데이터 처리
-            rows.forEach((row) => {
-              const name = row[0]; // 중개사무소명 (A열)
-              const address = row[1]; // 주소 (B열)
-              const phone = row[2] || "전화번호 미제공"; // 전화번호 (C열)
-              const contact = row[3]; // 담당자 (D열)
-              const ranking = row[4]; // 랭킹 (E열)
-              const lat = parseFloat(row[5]); // X좌표 (F열)
-              const lng = parseFloat(row[6]); // Y좌표 (G열)
-
-              // 마커 생성
-              const marker = new google.maps.Marker({
-                position: { lat, lng },
-                map: map,
-                title: name,
-              });
-
-              // 정보창 내용 구성
-              const infoContent = `
-                <h3>${name}</h3>
-                <p><strong>주소:</strong> ${address}</p>
-                <p><strong>전화번호:</strong> ${phone}</p>
-                <p><strong>담당자:</strong> ${contact}</p>
-                <p><strong>랭킹:</strong> ${ranking}</p>
-              `;
-
-              // 정보창을 마커에 연결
-              const infoWindow = new google.maps.InfoWindow({
-                content: infoContent,
-              });
-
-              // 마커 클릭 시 정보창 열기
-              marker.addListener("click", () => {
-                infoWindow.open(map, marker);
-              });
+            // 지도 생성
+            map = new google.maps.Map(document.getElementById('map'), {
+                zoom: 10,
+                center: center,
             });
-          } else {
-            console.log("데이터가 없습니다.");
-          }
-        });
-      }
+
+            // 구글 시트 데이터 로드
+            loadDataFromGoogleSheets();
+        }
+
+        // 구글 시트 API로 데이터 불러오기
+        function loadDataFromGoogleSheets() {
+            const spreadsheetId = '1ZszZW_iI-F6Q3N2M7c_l6JZTrcEMUHLwfOizLVbs3sY';  // 구글 시트 ID
+            const range = 'Sheet1!A2:G';  // 데이터 범위 (A열에서 G열까지)
+            const apiKey = 'AIzaSyBbgM7E_p4X7UZ_gnoSUe1fg71bU-kNSG0';  // API 키
+
+            const sheetAPI = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}?key=${apiKey}`;
+
+            fetch(sheetAPI)
+                .then(response => response.json())
+                .then(data => {
+                    const rows = data.values;
+                    if (rows.length) {
+                        rows.forEach(row => {
+                            const name = row[0];   // A열: 중개사무소명
+                            const address = row[1]; // B열: 주소
+                            const phone = row[2];   // C열: 전화번호
+                            const staff = row[3];   // D열: 담당자
+                            const ranking = row[4]; // E열: 랭킹
+                            const lat = parseFloat(row[5]);  // F열: X좌표
+                            const lng = parseFloat(row[6]);  // G열: Y좌표
+
+                            if (lat && lng) {
+                                const marker = new google.maps.Marker({
+                                    position: { lat: lat, lng: lng },
+                                    map: map,
+                                    title: name,
+                                });
+
+                                // 마커 클릭 시 정보 창 띄우기
+                                const infoWindow = new google.maps.InfoWindow({
+                                    content: `<div><strong>${name}</strong><br>${address}<br>전화: ${phone}<br>담당자: ${staff}<br>랭킹: ${ranking}</div>`,
+                                });
+
+                                marker.addListener('click', () => {
+                                    infoWindow.open(map, marker);
+                                });
+
+                                markers.push(marker);
+
+                                // 담당자 목록에 담당자 추가 (중복 제거)
+                                if (staff && !staffData.includes(staff)) {
+                                    staffData.push(staff);
+                                }
+                            }
+                        });
+
+                        // 담당자 선택 드롭다운 업데이트
+                        updateStaffSelect();
+                    } else {
+                        alert('데이터가 없습니다.');
+                    }
+                })
+                .catch(error => console.error('구글 시트 데이터 로드 오류:', error));
+        }
+
+        // 담당자 선택 드롭다운 업데이트
+        function updateStaffSelect() {
+            const staffSelect = document.getElementById('staff-select');
+            staffData.forEach(staff => {
+                const option = document.createElement('option');
+                option.value = staff;
+                option.textContent = staff;
+                staffSelect.appendChild(option);
+            });
+
+            // 담당자 선택 시 필터링
+            staffSelect.addEventListener('change', () => {
+                const selectedStaff = staffSelect.value;
+                filterMarkersByStaff(selectedStaff);
+            });
+        }
+
+        // 담당자에 따라 마커 필터링
+        function filterMarkersByStaff(staff) {
+            markers.forEach(marker => {
+                const title = marker.getTitle();
+                if (staff === '' || title.includes(staff)) {
+                    marker.setMap(map);  // 선택된 담당자의 마커만 지도에 표시
+                } else {
+                    marker.setMap(null);  // 선택되지 않은 담당자의 마커는 숨기기
+                }
+            });
+        }
     </script>
-  </body>
+</body>
 </html>
