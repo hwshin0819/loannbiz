@@ -150,6 +150,40 @@
             margin: 8px 0;
             line-height: 1.4;
         }
+
+        .filter-section {
+            padding: 15px 0;
+        }
+
+        .filter-divider {
+            margin: 10px 0;
+            border: none;
+            border-top: 1px solid #dee2e6;
+        }
+
+        .filter-section label {
+            display: block;
+            margin-bottom: 10px;
+            font-weight: 500;
+        }
+
+        .rank-inputs {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .rank-input {
+            width: 100px;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .rank-input::-webkit-inner-spin-button, 
+        .rank-input::-webkit-outer-spin-button { 
+            opacity: 1;
+        }
     </style>
 </head>
 <body>
@@ -164,15 +198,29 @@
     </div>
     <div class="filter-panel">
         <h3>필터</h3>
-        <label for="regionFilter">지역 선택:</label>
-        <div class="region-buttons">
-            <button data-region="수도권">수도권</button>
-            <button data-region="지방">지방</button>
+        <div class="filter-section">
+            <label for="regionFilter">지역 선택:</label>
+            <div class="region-buttons">
+                <button data-region="수도권">수도권</button>
+                <button data-region="지방">지방</button>
+            </div>
         </div>
-        <label for="managerFilter">담당자 선택:</label>
-        <select id="managerFilter" aria-label="담당자 필터">
-            <option value="">전체</option>
-        </select>
+        <hr class="filter-divider">
+        <div class="filter-section">
+            <label for="managerFilter">담당자 선택:</label>
+            <select id="managerFilter" aria-label="담당자 필터">
+                <option value="">전체</option>
+            </select>
+        </div>
+        <hr class="filter-divider">
+        <div class="filter-section">
+            <label for="rankFilter">순위 범위:</label>
+            <div class="rank-inputs">
+                <input type="number" id="minRank" min="1" max="200" placeholder="최소 순위" class="rank-input">
+                <span>~</span>
+                <input type="number" id="maxRank" min="1" max="200" placeholder="최대 순위" class="rank-input">
+            </div>
+        </div>
         <button onclick="MapController.getInstance().filterData()">검색</button>
         <button onclick="MapController.getInstance().clearFilters()">필터 초기화</button>
         <p id="resultCount" aria-live="polite">검색 결과: 0개</p>
@@ -192,8 +240,6 @@
                 this.currentInfoWindow = null;
                 this.partnerData = [];
                 this.selectedRegion = "";
-                this.radiusCircle = null;
-                this.nearbyMarkers = [];
                 
                 this.initializeMap();
             }
@@ -215,7 +261,8 @@
                     this.showError('초기화 실패: ' + error.message);
                 }
             }
-initMap() {
+
+            initMap() {
                 this.map = new naver.maps.Map('map', {
                     center: new naver.maps.LatLng(37.5666805, 126.9784147),
                     zoom: 11,
@@ -284,7 +331,6 @@ initMap() {
 
             updateMap(filteredData) {
                 this.clearMarkers();
-                this.clearNearbyMarkers();
                 const bounds = new naver.maps.LatLngBounds();
                 const dataToShow = filteredData || this.partnerData;
                 let validMarkers = 0;
@@ -308,11 +354,10 @@ initMap() {
                     });
 
                     naver.maps.Event.addListener(marker, 'click', () => {
-    if (this.currentInfoWindow) this.currentInfoWindow.close();
-    infoWindow.open(this.map, marker);
-    this.currentInfoWindow = infoWindow;
-    this.showNearbyOffices(item.yCoord, item.xCoord);
-});
+                        if (this.currentInfoWindow) this.currentInfoWindow.close();
+                        infoWindow.open(this.map, marker);
+                        this.currentInfoWindow = infoWindow;
+                    });
 
                     bounds.extend(position);
                     validMarkers++;
@@ -325,21 +370,13 @@ initMap() {
                 this.updateResultCount(validMarkers);
                 this.updateOfficeList(dataToShow);
             }
-clearMarkers() {
+
+            clearMarkers() {
                 this.markers.forEach(marker => {
                     marker.setMap(null);
                     this.markerPool.push(marker);
                 });
                 this.markers = [];
-            }
-
-            clearNearbyMarkers() {
-                if (this.radiusCircle) {
-                    this.radiusCircle.setMap(null);
-                    this.radiusCircle = null;
-                }
-                this.nearbyMarkers.forEach(marker => marker.setMap(null));
-                this.nearbyMarkers = [];
             }
 
             getMarker(position) {
@@ -355,83 +392,7 @@ clearMarkers() {
                 return marker;
             }
 
-            showNearbyOffices(centerLat, centerLon) {
-                this.clearNearbyMarkers();
-                
-                // 5km 반경 원 그리기
-                const center = new naver.maps.LatLng(centerLat, centerLon);
-                this.radiusCircle = new naver.maps.Circle({
-    map: this.map,
-    center: center,
-    radius: 3000,  // 3km
-    strokeColor: '#5F5F5F',
-    strokeOpacity: 0.3,
-    strokeWeight: 2,
-    fillColor: '#5F5F5F',
-    fillOpacity: 0.1
-});
-
-                // 5km 이내 중개사무소 찾기
-                const nearbyOffices = this.findNearbyOffices(centerLat, centerLon, 3);
-                
-                // 회색 마커로 표시
-                nearbyOffices.forEach(office => {
-                    if (office.yCoord === centerLat && office.xCoord === centerLon) return; // 중심점 제외
-
-                    const position = new naver.maps.LatLng(office.yCoord, office.xCoord);
-                    const marker = new naver.maps.Marker({
-                        position: position,
-                        map: this.map,
-                        icon: {
-                            content: '<div style="background-color: #808080; width: 24px; height: 24px; border-radius: 50%; border: 2px solid white;"></div>',
-                            anchor: new naver.maps.Point(12, 12)
-                        }
-                    });
-
-                    const infoWindow = new naver.maps.InfoWindow({
-                        content: `
-                            <div class="info-window">
-                                <h3>${office.name}</h3>
-                                <p>📍 ${office.address}</p>
-                                <p>📞 ${office.phone}</p>
-                                <p>👤 담당자: ${office.manager}</p>
-                                <p>🏆 랭킹: ${office.rank}</p>
-                            </div>
-                        `
-                    });
-
-                    naver.maps.Event.addListener(marker, 'click', () => {
-                        if (this.currentInfoWindow) this.currentInfoWindow.close();
-                        infoWindow.open(this.map, marker);
-                        this.currentInfoWindow = infoWindow;
-                    });
-
-                    this.nearbyMarkers.push(marker);
-                });
-            }
-
-            findNearbyOffices(centerLat, centerLon, radius) {
-                return this.partnerData.filter(office => {
-                    const distance = this.calculateDistance(
-                        centerLat, centerLon,
-                        office.yCoord, office.xCoord
-                    );
-                    return distance <= radius;
-                });
-            }
-
-            calculateDistance(lat1, lon1, lat2, lon2) {
-                const R = 6371; // 지구의 반경 (km)
-                const dLat = (lat2 - lat1) * Math.PI / 180;
-                const dLon = (lon2 - lon1) * Math.PI / 180;
-                const a = 
-                    Math.sin(dLat/2) * Math.sin(dLat/2) +
-                    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-                    Math.sin(dLon/2) * Math.sin(dLon/2);
-                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-                return R * c;
-            }
-toggleRegion(region) {
+            toggleRegion(region) {
                 this.selectedRegion = this.selectedRegion === region ? "" : region;
                 document.querySelectorAll('.region-buttons button').forEach(button => {
                     button.classList.toggle('active', button.dataset.region === this.selectedRegion);
@@ -440,34 +401,44 @@ toggleRegion(region) {
             }
 
             filterData() {
-                let filteredData = [...this.partnerData];
-                const managerFilter = document.getElementById('managerFilter').value;
+    let filteredData = [...this.partnerData];
+    const managerFilter = document.getElementById('managerFilter').value;
+    const minRank = parseInt(document.getElementById('minRank').value) || 1;
+    const maxRank = parseInt(document.getElementById('maxRank').value) || 200;
 
-                if (this.selectedRegion === "수도권") {
-                    filteredData = filteredData.filter(p => 
-                        p.address && ["서울", "경기", "인천"].some(region => p.address.includes(region))
-                    );
-                } else if (this.selectedRegion === "지방") {
-                    filteredData = filteredData.filter(p => 
-                        p.address && !["서울", "경기", "인천"].some(region => p.address.includes(region))
-                    );
-                }
+    // 순위 필터링
+    filteredData = filteredData.filter(p => {
+        const rank = parseInt(p.rank) || 201;  // 순위가 없는 경우 201로 처리
+        return rank >= minRank && rank <= maxRank;
+    });
 
-                if (managerFilter) {
-                    filteredData = filteredData.filter(p => p.manager === managerFilter);
-                }
+    if (managerFilter) {
+        filteredData = filteredData.filter(p => p.manager === managerFilter);
+    } else {
+        if (this.selectedRegion === "수도권") {
+            filteredData = filteredData.filter(p => 
+                p.address && ["서울", "경기", "인천"].some(region => p.address.includes(region))
+            );
+        } else if (this.selectedRegion === "지방") {
+            filteredData = filteredData.filter(p => 
+                p.address && !["서울", "경기", "인천"].some(region => p.address.includes(region))
+            );
+        }
+    }
 
-                this.updateMap(filteredData);
-            }
+    this.updateMap(filteredData);
+}
 
             clearFilters() {
-                this.selectedRegion = "";
-                document.querySelectorAll('.region-buttons button').forEach(button => {
-                    button.classList.remove('active');
-                });
-                document.getElementById('managerFilter').value = "";
-                this.filterData();
-            }
+    this.selectedRegion = "";
+    document.querySelectorAll('.region-buttons button').forEach(button => {
+        button.classList.remove('active');
+    });
+    document.getElementById('managerFilter').value = "";
+    document.getElementById('minRank').value = "";
+    document.getElementById('maxRank').value = "";
+    this.filterData();
+}
 
             populateManagerFilter() {
                 const managerSet = new Set(this.partnerData.map(p => p.manager).filter(Boolean));
@@ -484,41 +455,41 @@ toggleRegion(region) {
                         <li onclick="MapController.getInstance().handleListItemClick(${item.yCoord}, ${item.xCoord})">
                             <strong>${item.name}</strong>
                             <p>📍 ${item.address}</p>
-                            <p>📞 ${item.phone}</p>
-                            <p>👤 담당자: ${item.manager}</p>
-                            <p>🏆 랭킹: ${item.rank}</p>
-                        </li>
-                    `).join('');
-            }
+                           <p>📞 ${item.phone}</p>
+                           <p>👤 담당자: ${item.manager}</p>
+                           <p>🏆 랭킹: ${item.rank}</p>
+                       </li>
+                   `).join('');
+           }
 
-handleListItemClick(lat, lng) {
-    const position = new naver.maps.LatLng(lat, lng);
-    this.map.setCenter(position);
-    this.map.setZoom(15);
-}
+           handleListItemClick(lat, lng) {
+               const position = new naver.maps.LatLng(lat, lng);
+               this.map.setCenter(position);
+               this.map.setZoom(15);
+           }
 
-            updateResultCount(count) {
-                document.getElementById('resultCount').textContent = `검색 결과: ${count}개`;
-            }
+           updateResultCount(count) {
+               document.getElementById('resultCount').textContent = `검색 결과: ${count}개`;
+           }
 
-            showError(message) {
-                const errorElement = document.getElementById('uploadError');
-                errorElement.textContent = message;
-                errorElement.style.display = 'block';
-                setTimeout(() => {
-                    errorElement.style.display = 'none';
-                }, 5000);
-            }
+           showError(message) {
+               const errorElement = document.getElementById('uploadError');
+               errorElement.textContent = message;
+               errorElement.style.display = 'block';
+               setTimeout(() => {
+                   errorElement.style.display = 'none';
+               }, 5000);
+           }
 
-            showLoading(show) {
-                document.getElementById('loading').style.display = show ? 'block' : 'none';
-            }
-        }
+           showLoading(show) {
+               document.getElementById('loading').style.display = show ? 'block' : 'none';
+           }
+       }
 
-        // 페이지 로드 시 MapController 인스턴스 생성
-        document.addEventListener('DOMContentLoaded', () => {
-            MapController.getInstance();
-        });
-    </script>
+       // 페이지 로드 시 MapController 인스턴스 생성
+       document.addEventListener('DOMContentLoaded', () => {
+           MapController.getInstance();
+       });
+   </script>
 </body>
 </html>
