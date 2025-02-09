@@ -5,10 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>론앤비즈 파트너 중개업소</title>
     <script src="https://oapi.map.naver.com/openapi/v3/maps.js?ncpClientId=nrjjvl8zmx"></script>
-    <script src="https://apis.google.com/js/api.js"></script>
-    <script src="https://accounts.google.com/gsi/client"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
     <style>
-        /* 기존 스타일 유지 */
         :root {
             --primary-color: #28a745;
             --secondary-color: #6c757d;
@@ -186,9 +184,7 @@
             static instance = null;
             
             constructor() {
-                this.API_KEY = 'AIzaSyBbgM7E_p4X7UZ_gnoSUe1fg71bU-kNSG0';
-                this.SPREADSHEET_ID = '1ZszZW_iI-F6Q3N2M7c_l6JZTrcEMUHLwfOizLVbs3sY';
-                this.RANGE = 'Sheet1!A:G';
+                this.SPREADSHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTCMwtJ7iG_RxZo8Tw5wSnwtzC6G01y6og0jhe80A7RW550dRFEMI7DlK3l5CFab_If9r3raPgv6Ofb/pub?output=csv';
                 
                 this.map = null;
                 this.markers = [];
@@ -211,16 +207,15 @@
 
             async initializeMap() {
                 try {
-                    await this.initGoogleAPI();
                     this.initMap();
                     this.initEventListeners();
                     await this.loadSpreadsheetData();
                 } catch (error) {
+                    console.error('초기화 오류:', error);
                     this.showError('초기화 실패: ' + error.message);
                 }
             }
-
-            initMap() {
+initMap() {
                 this.map = new naver.maps.Map('map', {
                     center: new naver.maps.LatLng(37.5666805, 126.9784147),
                     zoom: 11,
@@ -245,50 +240,38 @@
                 });
             }
 
-            async initGoogleAPI() {
-                return new Promise((resolve, reject) => {
-                    gapi.load('client', async () => {
-                        try {
-                            await gapi.client.init({
-                                apiKey: this.API_KEY,
-                                discoveryDocs: ['https://sheets.googleapis.com/$discovery/rest?version=v4'],
-                            });
-                            resolve();
-                        } catch (error) {
-                            reject(error);
-                        }
-                    });
-                });
-            }
-
             async loadSpreadsheetData() {
                 this.showLoading(true);
                 try {
-                    const response = await gapi.client.sheets.spreadsheets.values.get({
-                        spreadsheetId: this.SPREADSHEET_ID,
-                        range: this.RANGE,
+                    const response = await fetch(this.SPREADSHEET_URL);
+                    const csvData = await response.text();
+                    
+                    Papa.parse(csvData, {
+                        header: true,
+                        skipEmptyLines: true,
+                        complete: (results) => {
+                            const mappedData = results.data.map(row => ({
+                                name: row['중개사무소명'] || '',
+                                address: row['주소'] || '',
+                                phone: row['전화번호'] || '',
+                                manager: row['담당자'] || '',
+                                rank: row['랭크'] || '',
+                                xCoord: parseFloat(row['X좌표']) || 0,
+                                yCoord: parseFloat(row['Y좌표']) || 0
+                            })).filter(item => item.xCoord && item.yCoord);
+
+                            this.processData(mappedData);
+                            this.showLoading(false);
+                        },
+                        error: (error) => {
+                            console.error('CSV 파싱 오류:', error);
+                            this.showError('데이터 파싱 실패: ' + error.message);
+                            this.showLoading(false);
+                        }
                     });
-
-                    const rows = response.result.values;
-                    if (!rows || rows.length === 0) {
-                        throw new Error('데이터가 없습니다.');
-                    }
-
-                    const mappedData = rows.slice(1).map(row => ({
-                        name: row[0] || '',     // 중개사무소명
-                        address: row[1] || '',   // 주소
-                        phone: row[2] || '',     // 전화번호
-                        manager: row[3] || '',   // 담당자
-                        rank: row[4] || '',      // 랭크
-                        xCoord: parseFloat(row[5]) || 0,  // X좌표
-                        yCoord: parseFloat(row[6]) || 0   // Y좌표
-                    })).filter(item => item.xCoord && item.yCoord);
-
-                    this.processData(mappedData);
                 } catch (error) {
-                    this.showError('스프레드시트 데이터를 불러오는데 실패했습니다: ' + error.message);
-                    console.error('Error loading spreadsheet:', error);
-                } finally {
+                    console.error('데이터 로딩 오류:', error);
+                    this.showError('데이터를 불러오는데 실패했습니다: ' + error.message);
                     this.showLoading(false);
                 }
             }
@@ -325,10 +308,11 @@
                     });
 
                     naver.maps.Event.addListener(marker, 'click', () => {
-                        if (this.currentInfoWindow) this.currentInfoWindow.close();
-                        infoWindow.open(this.map, marker);
-                        this.currentInfoWindow = infoWindow;
-                    });
+    if (this.currentInfoWindow) this.currentInfoWindow.close();
+    infoWindow.open(this.map, marker);
+    this.currentInfoWindow = infoWindow;
+    this.showNearbyOffices(item.yCoord, item.xCoord);
+});
 
                     bounds.extend(position);
                     validMarkers++;
@@ -341,8 +325,7 @@
                 this.updateResultCount(validMarkers);
                 this.updateOfficeList(dataToShow);
             }
-
-            clearMarkers() {
+clearMarkers() {
                 this.markers.forEach(marker => {
                     marker.setMap(null);
                     this.markerPool.push(marker);
@@ -373,10 +356,82 @@
             }
 
             showNearbyOffices(centerLat, centerLon) {
-                // 기존 코드와 동일
+                this.clearNearbyMarkers();
+                
+                // 5km 반경 원 그리기
+                const center = new naver.maps.LatLng(centerLat, centerLon);
+                this.radiusCircle = new naver.maps.Circle({
+    map: this.map,
+    center: center,
+    radius: 3000,  // 3km
+    strokeColor: '#5F5F5F',
+    strokeOpacity: 0.3,
+    strokeWeight: 2,
+    fillColor: '#5F5F5F',
+    fillOpacity: 0.1
+});
+
+                // 5km 이내 중개사무소 찾기
+                const nearbyOffices = this.findNearbyOffices(centerLat, centerLon, 3);
+                
+                // 회색 마커로 표시
+                nearbyOffices.forEach(office => {
+                    if (office.yCoord === centerLat && office.xCoord === centerLon) return; // 중심점 제외
+
+                    const position = new naver.maps.LatLng(office.yCoord, office.xCoord);
+                    const marker = new naver.maps.Marker({
+                        position: position,
+                        map: this.map,
+                        icon: {
+                            content: '<div style="background-color: #808080; width: 24px; height: 24px; border-radius: 50%; border: 2px solid white;"></div>',
+                            anchor: new naver.maps.Point(12, 12)
+                        }
+                    });
+
+                    const infoWindow = new naver.maps.InfoWindow({
+                        content: `
+                            <div class="info-window">
+                                <h3>${office.name}</h3>
+                                <p>📍 ${office.address}</p>
+                                <p>📞 ${office.phone}</p>
+                                <p>👤 담당자: ${office.manager}</p>
+                                <p>🏆 랭킹: ${office.rank}</p>
+                            </div>
+                        `
+                    });
+
+                    naver.maps.Event.addListener(marker, 'click', () => {
+                        if (this.currentInfoWindow) this.currentInfoWindow.close();
+                        infoWindow.open(this.map, marker);
+                        this.currentInfoWindow = infoWindow;
+                    });
+
+                    this.nearbyMarkers.push(marker);
+                });
             }
 
-            toggleRegion(region) {
+            findNearbyOffices(centerLat, centerLon, radius) {
+                return this.partnerData.filter(office => {
+                    const distance = this.calculateDistance(
+                        centerLat, centerLon,
+                        office.yCoord, office.xCoord
+                    );
+                    return distance <= radius;
+                });
+            }
+
+            calculateDistance(lat1, lon1, lat2, lon2) {
+                const R = 6371; // 지구의 반경 (km)
+                const dLat = (lat2 - lat1) * Math.PI / 180;
+                const dLon = (lon2 - lon1) * Math.PI / 180;
+                const a = 
+                    Math.sin(dLat/2) * Math.sin(dLat/2) +
+                    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+                    Math.sin(dLon/2) * Math.sin(dLon/2);
+                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+                return R * c;
+            }
+toggleRegion(region) {
                 this.selectedRegion = this.selectedRegion === region ? "" : region;
                 document.querySelectorAll('.region-buttons button').forEach(button => {
                     button.classList.toggle('active', button.dataset.region === this.selectedRegion);
@@ -405,7 +460,7 @@
                 this.updateMap(filteredData);
             }
 
-clearFilters() {
+            clearFilters() {
                 this.selectedRegion = "";
                 document.querySelectorAll('.region-buttons button').forEach(button => {
                     button.classList.remove('active');
@@ -436,12 +491,11 @@ clearFilters() {
                     `).join('');
             }
 
-            handleListItemClick(lat, lng) {
-                const position = new naver.maps.LatLng(lat, lng);
-                this.map.setCenter(position);
-                this.map.setZoom(15);
-                this.showNearbyOffices(lat, lng);
-            }
+handleListItemClick(lat, lng) {
+    const position = new naver.maps.LatLng(lat, lng);
+    this.map.setCenter(position);
+    this.map.setZoom(15);
+}
 
             updateResultCount(count) {
                 document.getElementById('resultCount').textContent = `검색 결과: ${count}개`;
