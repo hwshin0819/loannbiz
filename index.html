@@ -289,42 +289,47 @@
             }
 
             async loadSpreadsheetData() {
-                this.showLoading(true);
-                try {
-                    const response = await fetch(this.SPREADSHEET_URL);
-                    const csvData = await response.text();
-                    
-                    Papa.parse(csvData, {
-                        header: true,
-                        skipEmptyLines: true,
-                        complete: (results) => {
-    console.log("원본 데이터:", results.data); // 디버깅을 위해 추가
-    const mappedData = results.data.map(row => {
-        const mapped = {
-            name: row['중개사무소명'] || '',
-            address: row['주소'] || '',
-            phone: row['전화번호'] || '',
-            manager: row['담당자'] || '',
-            rank: row['랭크'] || '',
-            xCoord: parseFloat(row['X좌표']) || 0,
-            yCoord: parseFloat(row['Y좌표']) || 0,
-            isAnsimCare: String(row['안심케어여부']).toLowerCase() === 'TRUE'
-        };
-        console.log("매핑된 데이터:", mapped.name, "안심케어여부:", row['안심케어여부'], "->", mapped.isAnsimCare);
-        return mapped;
-    }).filter(item => item.xCoord && item.yCoord);
+    this.showLoading(true);
+    try {
+        const response = await fetch(this.SPREADSHEET_URL);
+        const csvData = await response.text();
+        
+        Papa.parse(csvData, {
+            header: true,
+            skipEmptyLines: true,
+            complete: (results) => {
+                console.log("CSV 원본 데이터:", results.data);  // 디버깅용
+                const mappedData = results.data.map(row => {
+                    const mapped = {
+                        name: row['중개사무소명'] || '',
+                        address: row['주소'] || '',
+                        phone: row['전화번호'] || '',
+                        manager: row['담당자'] || '',
+                        rank: row['랭크'] || '',
+                        xCoord: parseFloat(row['X좌표']) || 0,
+                        yCoord: parseFloat(row['Y좌표']) || 0,
+                        isAnsimCare: row['안심케어여부'] === 'TRUE' || row['안심케어여부'] === '1'
+                    };
+                    console.log("매핑된 데이터:", row['중개사무소명'], "안심케어여부:", row['안심케어여부'], "->", mapped.isAnsimCare);
+                    return mapped;
+                }).filter(item => item.xCoord && item.yCoord);
 
-    console.log("최종 데이터:", mappedData);
-    this.processData(mappedData);
-    this.showLoading(false);
-}
-                    });
-                } catch (error) {
-                    console.error('데이터 로딩 오류:', error);
-                    this.showError('데이터를 불러오는데 실패했습니다: ' + error.message);
-                    this.showLoading(false);
-                }
+                console.log("최종 데이터:", mappedData);
+                this.processData(mappedData);
+                this.showLoading(false);
+            },
+            error: (error) => {
+                console.error('CSV 파싱 오류:', error);
+                this.showError('데이터 파싱 실패: ' + error.message);
+                this.showLoading(false);
             }
+        });
+    } catch (error) {
+        console.error('데이터 로딩 오류:', error);
+        this.showError('데이터를 불러오는데 실패했습니다: ' + error.message);
+        this.showLoading(false);
+    }
+}
 
             processData(data) {
                 this.partnerData = data;
