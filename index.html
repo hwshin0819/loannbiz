@@ -188,7 +188,7 @@
 </head>
 <body>
     <div class="container">
-        <h1 style="text-align: center;">론앤비즈 중개사무소</h1>
+        <h1 style="text-align: center;">론앤비즈 금융서비스Part</h1>
         <div class="file-upload-container">
             <button id="refreshData" class="file-upload-label">데이터 새로고침</button>
             <div id="uploadError" class="error-message"></div>
@@ -304,7 +304,8 @@
                                 manager: row['담당자'] || '',
                                 rank: row['랭크'] || '',
                                 xCoord: parseFloat(row['X좌표']) || 0,
-                                yCoord: parseFloat(row['Y좌표']) || 0
+                                yCoord: parseFloat(row['Y좌표']) || 0,
+                                isAnsimCare: row['안심케어여부'] === 'true'
                             })).filter(item => item.xCoord && item.yCoord);
 
                             this.processData(mappedData);
@@ -329,6 +330,37 @@
                 this.populateManagerFilter();
             }
 
+            getMarker(position, isAnsimCare) {
+                let marker;
+                if (isAnsimCare) {
+                    // 안심케어 중개사용 초록색 마커
+                    marker = new naver.maps.Marker({
+                        position: position,
+                        icon: {
+                            content: `
+                                <div style="
+                                    background-color: #37B24D;
+                                    border-radius: 50%;
+                                    width: 22px;
+                                    height: 22px;
+                                    border: 2px solid white;
+                                    box-shadow: 0 2px 2px rgba(0,0,0,0.3);
+                                "></div>`,
+                            anchor: new naver.maps.Point(11, 11)
+                        }
+                    });
+                } else {
+                    // 일반 중개사는 기본 네이버 마커 사용
+                    marker = new naver.maps.Marker({
+                        position: position
+                    });
+                }
+                
+                marker.setMap(this.map);
+                this.markers.push(marker);
+                return marker;
+            }
+
             updateMap(filteredData) {
                 this.clearMarkers();
                 const bounds = new naver.maps.LatLngBounds();
@@ -339,7 +371,7 @@
                     if (!item.xCoord || !item.yCoord) return;
 
                     const position = new naver.maps.LatLng(item.yCoord, item.xCoord);
-                    const marker = this.getMarker(position);
+                    const marker = this.getMarker(position, item.isAnsimCare);
                     
                     const infoWindow = new naver.maps.InfoWindow({
                         content: `
@@ -379,82 +411,69 @@
                 this.markers = [];
             }
 
-            getMarker(position) {
-                let marker;
-                if (this.markerPool.length > 0) {
-                    marker = this.markerPool.pop();
-                    marker.setPosition(position);
-                } else {
-                    marker = new naver.maps.Marker({ position });
-                }
-                marker.setMap(this.map);
-                this.markers.push(marker);
-                return marker;
-            }
-
             toggleRegion(region) {
-                this.selectedRegion = this.selectedRegion === region ? "" : region;
-                document.querySelectorAll('.region-buttons button').forEach(button => {
-                    button.classList.toggle('active', button.dataset.region === this.selectedRegion);
-                });
-                this.filterData();
-            }
+               this.selectedRegion = this.selectedRegion === region ? "" : region;
+               document.querySelectorAll('.region-buttons button').forEach(button => {
+                   button.classList.toggle('active', button.dataset.region === this.selectedRegion);
+               });
+               this.filterData();
+           }
 
-            filterData() {
-    let filteredData = [...this.partnerData];
-    const managerFilter = document.getElementById('managerFilter').value;
-    const minRank = parseInt(document.getElementById('minRank').value) || 1;
-    const maxRank = parseInt(document.getElementById('maxRank').value) || 200;
+           filterData() {
+               let filteredData = [...this.partnerData];
+               const managerFilter = document.getElementById('managerFilter').value;
+               const minRank = parseInt(document.getElementById('minRank').value) || 1;
+               const maxRank = parseInt(document.getElementById('maxRank').value) || 200;
 
-    // 순위 필터링
-    filteredData = filteredData.filter(p => {
-        const rank = parseInt(p.rank) || 201;  // 순위가 없는 경우 201로 처리
-        return rank >= minRank && rank <= maxRank;
-    });
+               // 순위 필터링
+               filteredData = filteredData.filter(p => {
+                   const rank = parseInt(p.rank) || 201;  // 순위가 없는 경우 201로 처리
+                   return rank >= minRank && rank <= maxRank;
+               });
 
-    if (managerFilter) {
-        filteredData = filteredData.filter(p => p.manager === managerFilter);
-    } else {
-        if (this.selectedRegion === "수도권") {
-            filteredData = filteredData.filter(p => 
-                p.address && ["서울", "경기", "인천"].some(region => p.address.includes(region))
-            );
-        } else if (this.selectedRegion === "지방") {
-            filteredData = filteredData.filter(p => 
-                p.address && !["서울", "경기", "인천"].some(region => p.address.includes(region))
-            );
-        }
-    }
+               if (managerFilter) {
+                   filteredData = filteredData.filter(p => p.manager === managerFilter);
+               } else {
+                   if (this.selectedRegion === "수도권") {
+                       filteredData = filteredData.filter(p => 
+                           p.address && ["서울", "경기", "인천"].some(region => p.address.includes(region))
+                       );
+                   } else if (this.selectedRegion === "지방") {
+                       filteredData = filteredData.filter(p => 
+                           p.address && !["서울", "경기", "인천"].some(region => p.address.includes(region))
+                       );
+                   }
+               }
 
-    this.updateMap(filteredData);
-}
+               this.updateMap(filteredData);
+           }
 
-            clearFilters() {
-    this.selectedRegion = "";
-    document.querySelectorAll('.region-buttons button').forEach(button => {
-        button.classList.remove('active');
-    });
-    document.getElementById('managerFilter').value = "";
-    document.getElementById('minRank').value = "";
-    document.getElementById('maxRank').value = "";
-    this.filterData();
-}
+           clearFilters() {
+               this.selectedRegion = "";
+               document.querySelectorAll('.region-buttons button').forEach(button => {
+                   button.classList.remove('active');
+               });
+               document.getElementById('managerFilter').value = "";
+               document.getElementById('minRank').value = "";
+               document.getElementById('maxRank').value = "";
+               this.filterData();
+           }
 
-            populateManagerFilter() {
-                const managerSet = new Set(this.partnerData.map(p => p.manager).filter(Boolean));
-                const managerFilter = document.getElementById('managerFilter');
-                managerFilter.innerHTML = '<option value="">전체</option>' + 
-                    [...managerSet].sort().map(m => `<option value="${m}">${m}</option>`).join('');
-            }
+           populateManagerFilter() {
+               const managerSet = new Set(this.partnerData.map(p => p.manager).filter(Boolean));
+               const managerFilter = document.getElementById('managerFilter');
+               managerFilter.innerHTML = '<option value="">전체</option>' + 
+                   [...managerSet].sort().map(m => `<option value="${m}">${m}</option>`).join('');
+           }
 
-            updateOfficeList(filteredData) {
-                const officeList = document.getElementById('officeList');
-                officeList.innerHTML = (filteredData || this.partnerData)
-                    .filter(item => item.name && item.address)
-                    .map(item => `
-                        <li onclick="MapController.getInstance().handleListItemClick(${item.yCoord}, ${item.xCoord})">
-                            <strong>${item.name}</strong>
-                            <p>📍 ${item.address}</p>
+           updateOfficeList(filteredData) {
+               const officeList = document.getElementById('officeList');
+               officeList.innerHTML = (filteredData || this.partnerData)
+                   .filter(item => item.name && item.address)
+                   .map(item => `
+                       <li onclick="MapController.getInstance().handleListItemClick(${item.yCoord}, ${item.xCoord})">
+                           <strong>${item.name}</strong>
+                           <p>📍 ${item.address}</p>
                            <p>📞 ${item.phone}</p>
                            <p>👤 담당자: ${item.manager}</p>
                            <p>🏆 랭킹: ${item.rank}</p>
