@@ -199,12 +199,13 @@
     <div class="filter-panel">
         <h3>필터</h3>
         <div class="filter-section">
-            <label for="regionFilter">지역 선택:</label>
-            <div class="region-buttons">
-                <button data-region="수도권">수도권</button>
-                <button data-region="지방">지방</button>
-            </div>
-        </div>
+    <label for="regionFilter">조회 구분:</label>
+    <div class="region-buttons">
+        <button data-region="수도권">수도권</button>
+        <button data-region="지방">지방</button>
+        <button data-region="안심케어">안심케어</button>
+    </div>
+</div>
         <hr class="filter-divider">
         <div class="filter-section">
             <label for="managerFilter">담당자 선택:</label>
@@ -410,33 +411,35 @@
            }
 
            filterData() {
-               let filteredData = [...this.partnerData];
-               const managerFilter = document.getElementById('managerFilter').value;
-               const minRank = parseInt(document.getElementById('minRank').value) || 1;
-               const maxRank = parseInt(document.getElementById('maxRank').value) || 200;
+    let filteredData = [...this.partnerData];
+    const managerFilter = document.getElementById('managerFilter').value;
+    const minRank = parseInt(document.getElementById('minRank').value) || 1;
+    const maxRank = parseInt(document.getElementById('maxRank').value) || 200;
 
-               // 순위 필터링
-               filteredData = filteredData.filter(p => {
-                   const rank = parseInt(p.rank) || 201;  // 순위가 없는 경우 201로 처리
-                   return rank >= minRank && rank <= maxRank;
-               });
+    // 순위 필터링
+    filteredData = filteredData.filter(p => {
+        const rank = parseInt(p.rank) || 201;  // 순위가 없는 경우 201로 처리
+        return rank >= minRank && rank <= maxRank;
+    });
 
-               if (managerFilter) {
-                   filteredData = filteredData.filter(p => p.manager === managerFilter);
-               } else {
-                   if (this.selectedRegion === "수도권") {
-                       filteredData = filteredData.filter(p => 
-                           p.address && ["서울", "경기", "인천"].some(region => p.address.includes(region))
-                       );
-                   } else if (this.selectedRegion === "지방") {
-                       filteredData = filteredData.filter(p => 
-                           p.address && !["서울", "경기", "인천"].some(region => p.address.includes(region))
-                       );
-                   }
-               }
+    if (managerFilter) {
+        filteredData = filteredData.filter(p => p.manager === managerFilter);
+    } else {
+        if (this.selectedRegion === "수도권") {
+            filteredData = filteredData.filter(p => 
+                p.address && ["서울", "경기", "인천"].some(region => p.address.includes(region))
+            );
+        } else if (this.selectedRegion === "지방") {
+            filteredData = filteredData.filter(p => 
+                p.address && !["서울", "경기", "인천"].some(region => p.address.includes(region))
+            );
+        } else if (this.selectedRegion === "안심케어") {
+            filteredData = filteredData.filter(p => p.isAnsimCare === true);
+        }
+    }
 
-               this.updateMap(filteredData);
-           }
+    this.updateMap(filteredData);
+}
 
            clearFilters() {
                this.selectedRegion = "";
