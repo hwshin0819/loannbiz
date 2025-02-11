@@ -331,35 +331,22 @@
             }
 
             getMarker(position, isAnsimCare) {
-                let marker;
-                if (isAnsimCare) {
-                    // 안심케어 중개사용 초록색 마커
-                    marker = new naver.maps.Marker({
-                        position: position,
-                        icon: {
-                            content: `
-                                <div style="
-                                    background-color: #37B24D;
-                                    border-radius: 50%;
-                                    width: 22px;
-                                    height: 22px;
-                                    border: 2px solid white;
-                                    box-shadow: 0 2px 2px rgba(0,0,0,0.3);
-                                "></div>`,
-                            anchor: new naver.maps.Point(11, 11)
-                        }
-                    });
-                } else {
-                    // 일반 중개사는 기본 네이버 마커 사용
-                    marker = new naver.maps.Marker({
-                        position: position
-                    });
-                }
-                
-                marker.setMap(this.map);
-                this.markers.push(marker);
-                return marker;
-            }
+    let marker;
+    const markerOptions = {
+        position: position,
+        icon: {
+            content: isAnsimCare ? 
+                '<img src="https://ssl.pstatic.net/static/maps/v5/pin_default.png" ' +
+                'style="width: 22px; height: 35px; filter: hue-rotate(85deg);">' :
+                undefined
+        }
+    };
+    
+    marker = new naver.maps.Marker(markerOptions);
+    marker.setMap(this.map);
+    this.markers.push(marker);
+    return marker;
+}
 
             updateMap(filteredData) {
                 this.clearMarkers();
