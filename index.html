@@ -308,7 +308,7 @@
             rank: row['랭크'] || '',
             xCoord: parseFloat(row['X좌표']) || 0,
             yCoord: parseFloat(row['Y좌표']) || 0,
-            isAnsimCare: String(row['안심케어여부']).toLowerCase() === 'true'
+            isAnsimCare: String(row['안심케어여부']).toLowerCase() === 'TRUE'
         };
         console.log("매핑된 데이터:", mapped.name, "안심케어여부:", row['안심케어여부'], "->", mapped.isAnsimCare);
         return mapped;
