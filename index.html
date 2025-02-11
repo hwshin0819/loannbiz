@@ -332,24 +332,21 @@
 
             getMarker(position, isAnsimCare) {
     let marker;
+    const markerOptions = {
+        position: position,
+        map: this.map
+    };
+
     if (isAnsimCare) {
-        marker = new naver.maps.Marker({
-            position: position,
-            icon: {
-                path: 3,
-                fillColor: '#37B24D',  // 초록색
-                fillOpacity: 1,
-                strokeWeight: 0,
-                scale: 1
-            }
-        });
-    } else {
-        marker = new naver.maps.Marker({
-            position: position
-        });
+        markerOptions.icon = {
+            url: 'https://navermaps.github.io/maps.js.ncp/docs/img/example/pin_default.png',
+            size: new naver.maps.Size(22, 35),
+            origin: new naver.maps.Point(0, 0),
+            anchor: new naver.maps.Point(11, 35)
+        };
     }
     
-    marker.setMap(this.map);
+    marker = new naver.maps.Marker(markerOptions);
     this.markers.push(marker);
     return marker;
 }
