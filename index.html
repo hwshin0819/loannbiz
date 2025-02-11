@@ -332,17 +332,23 @@
 
             getMarker(position, isAnsimCare) {
     let marker;
-    const markerOptions = {
-        position: position,
-        icon: {
-            content: isAnsimCare ? 
-                '<img src="https://ssl.pstatic.net/static/maps/v5/pin_default.png" ' +
-                'style="width: 22px; height: 35px; filter: hue-rotate(85deg);">' :
-                undefined
-        }
-    };
+    if (isAnsimCare) {
+        marker = new naver.maps.Marker({
+            position: position,
+            icon: {
+                path: 3,
+                fillColor: '#37B24D',  // 초록색
+                fillOpacity: 1,
+                strokeWeight: 0,
+                scale: 1
+            }
+        });
+    } else {
+        marker = new naver.maps.Marker({
+            position: position
+        });
+    }
     
-    marker = new naver.maps.Marker(markerOptions);
     marker.setMap(this.map);
     this.markers.push(marker);
     return marker;
