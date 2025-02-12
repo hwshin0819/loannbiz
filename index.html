@@ -7,6 +7,7 @@
     <script src="https://oapi.map.naver.com/openapi/v3/maps.js?ncpClientId=nrjjvl8zmx"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
     <style>
+        /* 이전 스타일 코드 유지 */
         :root {
             --primary-color: #28a745;
             --secondary-color: #6c757d;
@@ -289,47 +290,47 @@
             }
 
             async loadSpreadsheetData() {
-    this.showLoading(true);
-    try {
-        const response = await fetch(this.SPREADSHEET_URL);
-        const csvData = await response.text();
-        
-        Papa.parse(csvData, {
-            header: true,
-            skipEmptyLines: true,
-            complete: (results) => {
-                console.log("CSV 원본 데이터:", results.data);  // 디버깅용
-                const mappedData = results.data.map(row => {
-                    const mapped = {
-                        name: row['중개사무소명'] || '',
-                        address: row['주소'] || '',
-                        phone: row['전화번호'] || '',
-                        manager: row['담당자'] || '',
-                        rank: row['랭크'] || '',
-                        xCoord: parseFloat(row['X좌표']) || 0,
-                        yCoord: parseFloat(row['Y좌표']) || 0,
-                        isAnsimCare: row['안심케어여부'] === 'TRUE' || row['안심케어여부'] === '1'
-                    };
-                    console.log("매핑된 데이터:", row['중개사무소명'], "안심케어여부:", row['안심케어여부'], "->", mapped.isAnsimCare);
-                    return mapped;
-                }).filter(item => item.xCoord && item.yCoord);
+                this.showLoading(true);
+                try {
+                    const response = await fetch(this.SPREADSHEET_URL);
+                    const csvData = await response.text();
+                    
+                    Papa.parse(csvData, {
+                        header: true,
+                        skipEmptyLines: true,
+                        complete: (results) => {
+                            console.log("CSV 원본 데이터:", results.data);  // 디버깅용
+                            const mappedData = results.data.map(row => {
+                                const mapped = {
+                                    name: row['중개사무소명'] || '',
+                                    address: row['주소'] || '',
+                                    phone: row['전화번호'] || '',
+                                    manager: row['담당자'] || '',
+                                    rank: row['랭크'] || '',
+                                    xCoord: parseFloat(row['X좌표']) || 0,
+                                    yCoord: parseFloat(row['Y좌표']) || 0,
+                                    isAnsimCare: row['안심케어여부'] === 'TRUE' || row['안심케어여부'] === '1'
+                                };
+                                console.log("매핑된 데이터:", row['중개사무소명'], "안심케어여부:", row['안심케어여부'], "->", mapped.isAnsimCare);
+                                return mapped;
+                            }).filter(item => item.xCoord && item.yCoord);
 
-                console.log("최종 데이터:", mappedData);
-                this.processData(mappedData);
-                this.showLoading(false);
-            },
-            error: (error) => {
-                console.error('CSV 파싱 오류:', error);
-                this.showError('데이터 파싱 실패: ' + error.message);
-                this.showLoading(false);
+                            console.log("최종 데이터:", mappedData);
+                            this.processData(mappedData);
+                            this.showLoading(false);
+                        },
+                        error: (error) => {
+                            console.error('CSV 파싱 오류:', error);
+                            this.showError('데이터 파싱 실패: ' + error.message);
+                            this.showLoading(false);
+                        }
+                    });
+                } catch (error) {
+                    console.error('데이터 로딩 오류:', error);
+                    this.showError('데이터를 불러오는데 실패했습니다: ' + error.message);
+                    this.showLoading(false);
+                }
             }
-        });
-    } catch (error) {
-        console.error('데이터 로딩 오류:', error);
-        this.showError('데이터를 불러오는데 실패했습니다: ' + error.message);
-        this.showLoading(false);
-    }
-}
 
             processData(data) {
                 this.partnerData = data;
@@ -338,25 +339,23 @@
             }
 
             getMarker(position, isAnsimCare) {
-    let marker;
-    const markerOptions = {
-        position: position,
-        map: this.map
-    };
+                let marker;
+                const markerOptions = {
+                    position: position,
+                    map: this.map
+                };
 
-    if (isAnsimCare) {
-        markerOptions.icon = {
-            url: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQXKWoubX8nfxBc-PpYtypKLAljIn0_HmSoFw&s',
-            size: new naver.maps.Size(24, 35),  // 이미지 크기에 맞게 조정
-            origin: new naver.maps.Point(0, 0),
-            anchor: new naver.maps.Point(12, 35)  // 핀 끝부분이 위치에 오도록 조정
-        };
-    }
-    
-    marker = new naver.maps.Marker(markerOptions);
-    this.markers.push(marker);
-    return marker;
-}
+                if (isAnsimCare) {
+                    markerOptions.icon = {
+                        content: '<div style="background-color: #FF4444; width: 24px; height: 24px; border-radius: 50%; display: flex; justify-content: center; align-items: center; color: white; font-size: 16px; font-weight: bold; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">★</div>',
+                        anchor: new naver.maps.Point(12, 12)
+                    };
+                }
+                
+                marker = new naver.maps.Marker(markerOptions);
+                this.markers.push(marker);
+                return marker;
+            }
 
             updateMap(filteredData) {
                 this.clearMarkers();
@@ -401,121 +400,121 @@
             }
 
             clearMarkers() {
-                this.markers.forEach(marker => {
-                    marker.setMap(null);
-                    this.markerPool.push(marker);
-                });
-                this.markers = [];
-            }
-
-            toggleRegion(region) {
-               this.selectedRegion = this.selectedRegion === region ? "" : region;
-               document.querySelectorAll('.region-buttons button').forEach(button => {
-                   button.classList.toggle('active', button.dataset.region === this.selectedRegion);
-               });
-               this.filterData();
-           }
-
-           filterData() {
-    let filteredData = [...this.partnerData];
-    console.log("초기 데이터:", filteredData); // 디버깅용 로그
-
-    const managerFilter = document.getElementById('managerFilter').value;
-    const minRank = parseInt(document.getElementById('minRank').value) || 1;
-    const maxRank = parseInt(document.getElementById('maxRank').value) || 200;
-
-    // 순위 필터링
-    filteredData = filteredData.filter(p => {
-        const rank = parseInt(p.rank) || 201;  // 순위가 없는 경우 201로 처리
-        return rank >= minRank && rank <= maxRank;
-    });
-
-    if (managerFilter) {
-        filteredData = filteredData.filter(p => p.manager === managerFilter);
-    }
-    
-    // 지역 필터링
-    if (this.selectedRegion === "수도권") {
-        filteredData = filteredData.filter(p => 
-            p.address && ["서울", "경기", "인천"].some(region => p.address.includes(region))
-        );
-    } else if (this.selectedRegion === "지방") {
-        filteredData = filteredData.filter(p => 
-            p.address && !["서울", "경기", "인천"].some(region => p.address.includes(region))
-        );
-    } else if (this.selectedRegion === "안심케어") {
-        console.log("안심케어 필터 적용 전:", filteredData.length); // 디버깅용 로그
-        filteredData = filteredData.filter(p => {
-            console.log(p.name, "안심케어 여부:", p.isAnsimCare); // 디버깅용 로그
-            return p.isAnsimCare === true;
-        });
-        console.log("안심케어 필터 적용 후:", filteredData.length); // 디버깅용 로그
-    }
-
-    this.updateMap(filteredData);
+   this.markers.forEach(marker => {
+       marker.setMap(null);
+       this.markerPool.push(marker);
+   });
+   this.markers = [];
 }
 
-           clearFilters() {
-               this.selectedRegion = "";
-               document.querySelectorAll('.region-buttons button').forEach(button => {
-                   button.classList.remove('active');
-               });
-               document.getElementById('managerFilter').value = "";
-               document.getElementById('minRank').value = "";
-               document.getElementById('maxRank').value = "";
-               this.filterData();
-           }
+toggleRegion(region) {
+   this.selectedRegion = this.selectedRegion === region ? "" : region;
+   document.querySelectorAll('.region-buttons button').forEach(button => {
+       button.classList.toggle('active', button.dataset.region === this.selectedRegion);
+   });
+   this.filterData();
+}
 
-           populateManagerFilter() {
-               const managerSet = new Set(this.partnerData.map(p => p.manager).filter(Boolean));
-               const managerFilter = document.getElementById('managerFilter');
-               managerFilter.innerHTML = '<option value="">전체</option>' + 
-                   [...managerSet].sort().map(m => `<option value="${m}">${m}</option>`).join('');
-           }
+filterData() {
+   let filteredData = [...this.partnerData];
+   console.log("초기 데이터:", filteredData); // 디버깅용 로그
 
-           updateOfficeList(filteredData) {
-               const officeList = document.getElementById('officeList');
-               officeList.innerHTML = (filteredData || this.partnerData)
-                   .filter(item => item.name && item.address)
-                   .map(item => `
-                       <li onclick="MapController.getInstance().handleListItemClick(${item.yCoord}, ${item.xCoord})">
-                           <strong>${item.name}</strong>
-                           <p>📍 ${item.address}</p>
-                           <p>📞 ${item.phone}</p>
-                           <p>👤 담당자: ${item.manager}</p>
-                           <p>🏆 랭킹: ${item.rank}</p>
-                       </li>
-                   `).join('');
-           }
+   const managerFilter = document.getElementById('managerFilter').value;
+   const minRank = parseInt(document.getElementById('minRank').value) || 1;
+   const maxRank = parseInt(document.getElementById('maxRank').value) || 200;
 
-           handleListItemClick(lat, lng) {
-               const position = new naver.maps.LatLng(lat, lng);
-               this.map.setCenter(position);
-               this.map.setZoom(15);
-           }
+   // 순위 필터링
+   filteredData = filteredData.filter(p => {
+       const rank = parseInt(p.rank) || 201;  // 순위가 없는 경우 201로 처리
+       return rank >= minRank && rank <= maxRank;
+   });
 
-           updateResultCount(count) {
-               document.getElementById('resultCount').textContent = `검색 결과: ${count}개`;
-           }
-
-           showError(message) {
-               const errorElement = document.getElementById('uploadError');
-               errorElement.textContent = message;
-               errorElement.style.display = 'block';
-               setTimeout(() => {
-                   errorElement.style.display = 'none';
-               }, 5000);
-           }
-
-           showLoading(show) {
-               document.getElementById('loading').style.display = show ? 'block' : 'none';
-           }
-       }
-
-       // 페이지 로드 시 MapController 인스턴스 생성
-       document.addEventListener('DOMContentLoaded', () => {
-           MapController.getInstance();
+   if (managerFilter) {
+       filteredData = filteredData.filter(p => p.manager === managerFilter);
+   }
+   
+   // 지역 필터링
+   if (this.selectedRegion === "수도권") {
+       filteredData = filteredData.filter(p => 
+           p.address && ["서울", "경기", "인천"].some(region => p.address.includes(region))
+       );
+   } else if (this.selectedRegion === "지방") {
+       filteredData = filteredData.filter(p => 
+           p.address && !["서울", "경기", "인천"].some(region => p.address.includes(region))
+       );
+   } else if (this.selectedRegion === "안심케어") {
+       console.log("안심케어 필터 적용 전:", filteredData.length); // 디버깅용 로그
+       filteredData = filteredData.filter(p => {
+           console.log(p.name, "안심케어 여부:", p.isAnsimCare); // 디버깅용 로그
+           return p.isAnsimCare === true;
        });
-   </script>
+       console.log("안심케어 필터 적용 후:", filteredData.length); // 디버깅용 로그
+   }
+
+   this.updateMap(filteredData);
+}
+
+clearFilters() {
+   this.selectedRegion = "";
+   document.querySelectorAll('.region-buttons button').forEach(button => {
+       button.classList.remove('active');
+   });
+   document.getElementById('managerFilter').value = "";
+   document.getElementById('minRank').value = "";
+   document.getElementById('maxRank').value = "";
+   this.filterData();
+}
+
+populateManagerFilter() {
+   const managerSet = new Set(this.partnerData.map(p => p.manager).filter(Boolean));
+   const managerFilter = document.getElementById('managerFilter');
+   managerFilter.innerHTML = '<option value="">전체</option>' + 
+       [...managerSet].sort().map(m => `<option value="${m}">${m}</option>`).join('');
+}
+
+updateOfficeList(filteredData) {
+   const officeList = document.getElementById('officeList');
+   officeList.innerHTML = (filteredData || this.partnerData)
+       .filter(item => item.name && item.address)
+       .map(item => `
+           <li onclick="MapController.getInstance().handleListItemClick(${item.yCoord}, ${item.xCoord})">
+               <strong>${item.name}</strong>
+               <p>📍 ${item.address}</p>
+               <p>📞 ${item.phone}</p>
+               <p>👤 담당자: ${item.manager}</p>
+               <p>🏆 랭킹: ${item.rank}</p>
+           </li>
+       `).join('');
+}
+
+handleListItemClick(lat, lng) {
+   const position = new naver.maps.LatLng(lat, lng);
+   this.map.setCenter(position);
+   this.map.setZoom(15);
+}
+
+updateResultCount(count) {
+   document.getElementById('resultCount').textContent = `검색 결과: ${count}개`;
+}
+
+showError(message) {
+   const errorElement = document.getElementById('uploadError');
+   errorElement.textContent = message;
+   errorElement.style.display = 'block';
+   setTimeout(() => {
+       errorElement.style.display = 'none';
+   }, 5000);
+}
+
+showLoading(show) {
+   document.getElementById('loading').style.display = show ? 'block' : 'none';
+}
+}
+
+// 페이지 로드 시 MapController 인스턴스 생성
+document.addEventListener('DOMContentLoaded', () => {
+   MapController.getInstance();
+});
+</script>
 </body>
 </html>
