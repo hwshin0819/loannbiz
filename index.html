@@ -301,16 +301,19 @@
                         complete: (results) => {
                             console.log("CSV 원본 데이터:", results.data);  // 디버깅용
                             const mappedData = results.data.map(row => {
-                                const mapped = {
-                                    name: row['중개사무소명'] || '',
-                                    address: row['주소'] || '',
-                                    phone: row['전화번호'] || '',
-                                    manager: row['담당자'] || '',
-                                    rank: row['랭크'] || '',
-                                    xCoord: parseFloat(row['X좌표']) || 0,
-                                    yCoord: parseFloat(row['Y좌표']) || 0,
-                                    isAnsimCare: row['안심케어여부'] === 'TRUE' || row['안심케어여부'] === '1'
-                                };
+    const mapped = {
+        name: row['중개사무소명'] || '',
+        address: row['주소'] || '',
+        phone: row['전화번호'] || '',
+        manager: row['담당자'] || '',
+        rank: row['랭크'] || '',
+        xCoord: parseFloat(row['X좌표']) || 0,
+        yCoord: parseFloat(row['Y좌표']) || 0,
+        isAnsimCare: row['안심케어여부'] === true || 
+                    row['안심케어여부'] === 'TRUE' || 
+                    row['안심케어여부'] === 'true' ||
+                    row['안심케어여부'] === '1'
+    };
                                 console.log("매핑된 데이터:", row['중개사무소명'], "안심케어여부:", row['안심케어여부'], "->", mapped.isAnsimCare);
                                 return mapped;
                             }).filter(item => item.xCoord && item.yCoord);
