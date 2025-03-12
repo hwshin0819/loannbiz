@@ -185,6 +185,25 @@
         .rank-input::-webkit-outer-spin-button { 
             opacity: 1;
         }
+        
+        .badge {
+            display: inline-block;
+            font-size: 12px;
+            font-weight: bold;
+            padding: 3px 8px;
+            border-radius: 12px;
+            margin-right: 5px;
+        }
+        
+        .badge-ansim {
+            background-color: #FF4444;
+            color: white;
+        }
+        
+        .badge-interview {
+            background-color: #9C27B0;
+            color: white;
+        }
     </style>
 </head>
 <body>
@@ -200,12 +219,14 @@
     <div class="filter-panel">
         <h3>필터</h3>
         <div class="filter-section">
-    <label for="regionFilter">지역 구분:</label>
-<div class="region-buttons">
-    <button data-region="수도권">수도권</button>
-    <button data-region="지방">지방</button>
-</div>
-</div>
+            <label for="regionFilter">필터:</label>
+            <div class="region-buttons">
+                <button data-region="수도권">수도권</button>
+                <button data-region="지방">지방</button>
+                <button data-region="안심케어">안심케어</button>
+                <button data-region="현장인터뷰">현장인터뷰</button>
+            </div>
+        </div>
         <hr class="filter-divider">
         <div class="filter-section">
             <label for="managerFilter">담당자 선택:</label>
@@ -300,20 +321,32 @@
                         complete: (results) => {
                             console.log("CSV 원본 데이터:", results.data);  // 디버깅용
                             const mappedData = results.data.map(row => {
-    const mapped = {
-        name: row['중개사무소명'] || '',
-        address: row['주소'] || '',
-        phone: row['전화번호'] || '',
-        manager: row['담당자'] || '',
-        rank: row['랭크'] || '',
-        xCoord: parseFloat(row['X좌표']) || 0,
-        yCoord: parseFloat(row['Y좌표']) || 0,
-        isAnsimCare: row['안심케어여부'] === true || 
-                    row['안심케어여부'] === 'TRUE' || 
-                    row['안심케어여부'] === 'true' ||
-                    row['안심케어여부'] === '1'
-    };
-                                console.log("매핑된 데이터:", row['중개사무소명'], "안심케어여부:", row['안심케어여부'], "->", mapped.isAnsimCare);
+                                const isAnsimCare = 
+                                    row['안심케어여부'] === true || 
+                                    row['안심케어여부'] === 'TRUE' || 
+                                    row['안심케어여부'] === 'true' ||
+                                    row['안심케어여부'] === '1';
+                                
+                                const isFieldInterview = 
+                                    row['현장인터뷰 여부'] === true || 
+                                    row['현장인터뷰 여부'] === 'TRUE' || 
+                                    row['현장인터뷰 여부'] === 'true' ||
+                                    row['현장인터뷰 여부'] === '1';
+                                
+                                const mapped = {
+                                    name: row['중개사무소명'] || '',
+                                    address: row['주소'] || '',
+                                    phone: row['전화번호'] || '',
+                                    manager: row['담당자'] || '',
+                                    rank: row['랭크'] || '',
+                                    xCoord: parseFloat(row['X좌표']) || 0,
+                                    yCoord: parseFloat(row['Y좌표']) || 0,
+                                    isAnsimCare: isAnsimCare,
+                                    isFieldInterview: isFieldInterview
+                                };
+                                console.log("매핑된 데이터:", row['중개사무소명'], 
+                                          "안심케어여부:", row['안심케어여부'], "->", mapped.isAnsimCare,
+                                          "현장인터뷰여부:", row['현장인터뷰 여부'], "->", mapped.isFieldInterview);
                                 return mapped;
                             }).filter(item => item.xCoord && item.yCoord);
 
@@ -340,14 +373,19 @@
                 this.populateManagerFilter();
             }
 
-            getMarker(position, isAnsimCare) {
+            getMarker(position, isAnsimCare, isFieldInterview) {
                 let marker;
                 const markerOptions = {
                     position: position,
                     map: this.map
                 };
 
-                if (isAnsimCare) {
+                if (isFieldInterview) {
+                    markerOptions.icon = {
+                        content: '<div style="background-color: #9C27B0; width: 24px; height: 24px; border-radius: 50%; display: flex; justify-content: center; align-items: center; color: white; font-size: 16px; font-weight: bold; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">🎤</div>',
+                        anchor: new naver.maps.Point(12, 12)
+                    };
+                } else if (isAnsimCare) {
                     markerOptions.icon = {
                         content: '<div style="background-color: #FF4444; width: 24px; height: 24px; border-radius: 50%; display: flex; justify-content: center; align-items: center; color: white; font-size: 16px; font-weight: bold; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">★</div>',
                         anchor: new naver.maps.Point(12, 12)
@@ -369,7 +407,11 @@
                     if (!item.xCoord || !item.yCoord) return;
 
                     const position = new naver.maps.LatLng(item.yCoord, item.xCoord);
-                    const marker = this.getMarker(position, item.isAnsimCare);
+                    const marker = this.getMarker(position, item.isAnsimCare, item.isFieldInterview);
+                    
+                    const badges = [];
+                    if (item.isAnsimCare) badges.push('<span class="badge badge-ansim">안심케어</span>');
+                    if (item.isFieldInterview) badges.push('<span class="badge badge-interview">현장인터뷰</span>');
                     
                     const infoWindow = new naver.maps.InfoWindow({
                         content: `
@@ -379,6 +421,7 @@
                                 <p>📞 ${item.phone}</p>
                                 <p>👤 담당자: ${item.manager}</p>
                                 <p>🏆 랭킹: ${item.rank}</p>
+                                <p>${badges.join(' ')}</p>
                             </div>
                         `
                     });
@@ -402,121 +445,135 @@
             }
 
             clearMarkers() {
-   this.markers.forEach(marker => {
-       marker.setMap(null);
-       this.markerPool.push(marker);
-   });
-   this.markers = [];
-}
+                this.markers.forEach(marker => {
+                    marker.setMap(null);
+                    this.markerPool.push(marker);
+                });
+                this.markers = [];
+            }
 
-toggleRegion(region) {
-   this.selectedRegion = this.selectedRegion === region ? "" : region;
-   document.querySelectorAll('.region-buttons button').forEach(button => {
-       button.classList.toggle('active', button.dataset.region === this.selectedRegion);
-   });
-   this.filterData();
-}
+            toggleRegion(region) {
+                this.selectedRegion = this.selectedRegion === region ? "" : region;
+                document.querySelectorAll('.region-buttons button').forEach(button => {
+                    button.classList.toggle('active', button.dataset.region === this.selectedRegion);
+                });
+                this.filterData();
+            }
 
-filterData() {
-   let filteredData = [...this.partnerData];
-   console.log("초기 데이터:", filteredData); // 디버깅용 로그
+            filterData() {
+                let filteredData = [...this.partnerData];
+                console.log("초기 데이터:", filteredData); // 디버깅용 로그
 
-   const managerFilter = document.getElementById('managerFilter').value;
-   const minRank = parseInt(document.getElementById('minRank').value) || 1;
-   const maxRank = parseInt(document.getElementById('maxRank').value) || 200;
+                const managerFilter = document.getElementById('managerFilter').value;
+                const minRank = parseInt(document.getElementById('minRank').value) || 1;
+                const maxRank = parseInt(document.getElementById('maxRank').value) || 200;
 
-   // 순위 필터링
-   filteredData = filteredData.filter(p => {
-       const rank = parseInt(p.rank) || 201;  // 순위가 없는 경우 201로 처리
-       return rank >= minRank && rank <= maxRank;
-   });
+                // 순위 필터링
+                filteredData = filteredData.filter(p => {
+                    const rank = parseInt(p.rank) || 201;  // 순위가 없는 경우 201로 처리
+                    return rank >= minRank && rank <= maxRank;
+                });
 
-   if (managerFilter) {
-       filteredData = filteredData.filter(p => p.manager === managerFilter);
-   }
-   
-   // 지역 필터링
-   if (this.selectedRegion === "수도권") {
-       filteredData = filteredData.filter(p => 
-           p.address && ["서울", "경기", "인천"].some(region => p.address.includes(region))
-       );
-   } else if (this.selectedRegion === "지방") {
-       filteredData = filteredData.filter(p => 
-           p.address && !["서울", "경기", "인천"].some(region => p.address.includes(region))
-       );
-   } else if (this.selectedRegion === "안심케어") {
-       console.log("안심케어 필터 적용 전:", filteredData.length); // 디버깅용 로그
-       filteredData = filteredData.filter(p => {
-           console.log(p.name, "안심케어 여부:", p.isAnsimCare); // 디버깅용 로그
-           return p.isAnsimCare === true;
-       });
-       console.log("안심케어 필터 적용 후:", filteredData.length); // 디버깅용 로그
-   }
+                if (managerFilter) {
+                    filteredData = filteredData.filter(p => p.manager === managerFilter);
+                }
+                
+                // 지역/특성 필터링
+                if (this.selectedRegion === "수도권") {
+                    filteredData = filteredData.filter(p => 
+                        p.address && ["서울", "경기", "인천"].some(region => p.address.includes(region))
+                    );
+                } else if (this.selectedRegion === "지방") {
+                    filteredData = filteredData.filter(p => 
+                        p.address && !["서울", "경기", "인천"].some(region => p.address.includes(region))
+                    );
+                } else if (this.selectedRegion === "안심케어") {
+                    console.log("안심케어 필터 적용 전:", filteredData.length); // 디버깅용 로그
+                    filteredData = filteredData.filter(p => {
+                        console.log(p.name, "안심케어 여부:", p.isAnsimCare); // 디버깅용 로그
+                        return p.isAnsimCare === true;
+                    });
+                    console.log("안심케어 필터 적용 후:", filteredData.length); // 디버깅용 로그
+                } else if (this.selectedRegion === "현장인터뷰") {
+                    console.log("현장인터뷰 필터 적용 전:", filteredData.length);
+                    filteredData = filteredData.filter(p => {
+                        console.log(p.name, "현장인터뷰 여부:", p.isFieldInterview);
+                        return p.isFieldInterview === true;
+                    });
+                    console.log("현장인터뷰 필터 적용 후:", filteredData.length);
+                }
 
-   this.updateMap(filteredData);
-}
+                this.updateMap(filteredData);
+            }
 
-clearFilters() {
-   this.selectedRegion = "";
-   document.querySelectorAll('.region-buttons button').forEach(button => {
-       button.classList.remove('active');
-   });
-   document.getElementById('managerFilter').value = "";
-   document.getElementById('minRank').value = "";
-   document.getElementById('maxRank').value = "";
-   this.filterData();
-}
+            clearFilters() {
+                this.selectedRegion = "";
+                document.querySelectorAll('.region-buttons button').forEach(button => {
+                    button.classList.remove('active');
+                });
+                document.getElementById('managerFilter').value = "";
+                document.getElementById('minRank').value = "";
+                document.getElementById('maxRank').value = "";
+                this.filterData();
+            }
 
-populateManagerFilter() {
-   const managerSet = new Set(this.partnerData.map(p => p.manager).filter(Boolean));
-   const managerFilter = document.getElementById('managerFilter');
-   managerFilter.innerHTML = '<option value="">전체</option>' + 
-       [...managerSet].sort().map(m => `<option value="${m}">${m}</option>`).join('');
-}
+            populateManagerFilter() {
+                const managerSet = new Set(this.partnerData.map(p => p.manager).filter(Boolean));
+                const managerFilter = document.getElementById('managerFilter');
+                managerFilter.innerHTML = '<option value="">전체</option>' + 
+                    [...managerSet].sort().map(m => `<option value="${m}">${m}</option>`).join('');
+            }
 
-updateOfficeList(filteredData) {
-   const officeList = document.getElementById('officeList');
-   officeList.innerHTML = (filteredData || this.partnerData)
-       .filter(item => item.name && item.address)
-       .map(item => `
-           <li onclick="MapController.getInstance().handleListItemClick(${item.yCoord}, ${item.xCoord})">
-               <strong>${item.name}</strong>
-               <p>📍 ${item.address}</p>
-               <p>📞 ${item.phone}</p>
-               <p>👤 담당자: ${item.manager}</p>
-               <p>🏆 랭킹: ${item.rank}</p>
-           </li>
-       `).join('');
-}
+            updateOfficeList(filteredData) {
+                const officeList = document.getElementById('officeList');
+                officeList.innerHTML = (filteredData || this.partnerData)
+                    .filter(item => item.name && item.address)
+                    .map(item => {
+                        const badges = [];
+                        if (item.isAnsimCare) badges.push('<span class="badge badge-ansim">안심케어</span>');
+                        if (item.isFieldInterview) badges.push('<span class="badge badge-interview">현장인터뷰</span>');
+                        
+                        return `
+                            <li onclick="MapController.getInstance().handleListItemClick(${item.yCoord}, ${item.xCoord})">
+                                <strong>${item.name}</strong>
+                                <p>📍 ${item.address}</p>
+                                <p>📞 ${item.phone}</p>
+                                <p>👤 담당자: ${item.manager}</p>
+                                <p>🏆 랭킹: ${item.rank}</p>
+                                <p>${badges.join(' ')}</p>
+                            </li>
+                        `;
+                    }).join('');
+            }
 
-handleListItemClick(lat, lng) {
-   const position = new naver.maps.LatLng(lat, lng);
-   this.map.setCenter(position);
-   this.map.setZoom(15);
-}
+            handleListItemClick(lat, lng) {
+                const position = new naver.maps.LatLng(lat, lng);
+                this.map.setCenter(position);
+                this.map.setZoom(15);
+            }
 
-updateResultCount(count) {
-   document.getElementById('resultCount').textContent = `검색 결과: ${count}개`;
-}
+            updateResultCount(count) {
+                document.getElementById('resultCount').textContent = `검색 결과: ${count}개`;
+            }
 
-showError(message) {
-   const errorElement = document.getElementById('uploadError');
-   errorElement.textContent = message;
-   errorElement.style.display = 'block';
-   setTimeout(() => {
-       errorElement.style.display = 'none';
-   }, 5000);
-}
+            showError(message) {
+                const errorElement = document.getElementById('uploadError');
+                errorElement.textContent = message;
+                errorElement.style.display = 'block';
+                setTimeout(() => {
+                    errorElement.style.display = 'none';
+                }, 5000);
+            }
 
-showLoading(show) {
-   document.getElementById('loading').style.display = show ? 'block' : 'none';
-}
-}
+            showLoading(show) {
+                document.getElementById('loading').style.display = show ? 'block' : 'none';
+            }
+        }
 
-// 페이지 로드 시 MapController 인스턴스 생성
-document.addEventListener('DOMContentLoaded', () => {
-   MapController.getInstance();
-});
-</script>
+        // 페이지 로드 시 MapController 인스턴스 생성
+        document.addEventListener('DOMContentLoaded', () => {
+            MapController.getInstance();
+        });
+    </script>
 </body>
 </html>
